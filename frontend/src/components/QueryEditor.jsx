@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Play, Database, Loader2, AlignLeft, Code2, Copy, FileText, LayoutTemplate } from 'lucide-react';
+import { Play, Database, Loader2, AlignLeft, Code2, Copy, LayoutTemplate, ChevronDown } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { format } from 'sql-formatter';
 import toast from 'react-hot-toast';
@@ -48,83 +48,106 @@ export default function QueryEditor({ onOptimize, isLoading, explanationLevel, s
     toast.success('Copied to clipboard');
   };
 
+  const selectClass = "appearance-none bg-[#0f111a] border border-white/10 text-sm text-slate-300 rounded-lg focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 cursor-pointer font-medium px-3 py-1.5 pr-7 transition-all duration-150";
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden flex flex-col shadow-sm h-[600px]">
+    <div className="bg-[#0a0d14] rounded-2xl border border-white/8 overflow-hidden flex flex-col h-[620px] shadow-2xl">
+
       {/* Header */}
-      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Database className="w-5 h-5 text-blue-500" />
-          <select 
-            value={dbType}
-            onChange={(e) => setDbType(e.target.value)}
-            className="bg-white border border-gray-300 text-sm text-gray-700 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer font-medium px-3 py-1.5"
-          >
-            <option value="PostgreSQL">PostgreSQL</option>
-            <option value="MySQL">MySQL</option>
-            <option value="SQLite">SQLite</option>
-            <option value="SQL Server">SQL Server</option>
-          </select>
-          <select
-            value={explanationLevel}
-            onChange={(e) => setExplanationLevel(e.target.value)}
-            className="bg-white border border-gray-300 text-sm text-gray-700 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer font-medium px-3 py-1.5"
-          >
-            <option value="Beginner">Level: Beginner</option>
-            <option value="Intermediate">Level: Intermediate</option>
-            <option value="DBA Expert">Level: DBA Expert</option>
-          </select>
+      <div className="px-4 py-3 border-b border-white/6 flex flex-wrap justify-between items-center gap-3" style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 text-slate-500">
+            <Database className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Config</span>
+          </div>
+          <div className="relative">
+            <select
+              value={dbType}
+              onChange={(e) => setDbType(e.target.value)}
+              className={selectClass}
+            >
+              <option value="PostgreSQL">PostgreSQL</option>
+              <option value="MySQL">MySQL</option>
+              <option value="SQLite">SQLite</option>
+              <option value="SQL Server">SQL Server</option>
+            </select>
+            <ChevronDown className="w-3 h-3 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select
+              value={explanationLevel}
+              onChange={(e) => setExplanationLevel(e.target.value)}
+              className={selectClass}
+            >
+              <option value="Beginner">Beginner</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="DBA Expert">DBA Expert</option>
+            </select>
+            <ChevronDown className="w-3 h-3 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
-        
+
         <button
           onClick={handleSubmit}
           disabled={!query.trim() || isLoading}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm w-full sm:w-auto justify-center"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 shadow-[0_0_16px_-4px_rgba(37,99,235,0.5)] hover:shadow-[0_0_20px_-4px_rgba(37,99,235,0.7)] w-full sm:w-auto justify-center"
         >
-          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          {isLoading ? 'Analyzing...' : 'Optimize Query'}
+          {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+          {isLoading ? 'Analyzing...' : 'Optimize'}
         </button>
       </div>
 
       {/* Toolbar */}
-      <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <button onClick={handleFormat} className="text-xs font-medium text-gray-600 hover:text-blue-600 flex items-center gap-1.5 bg-white hover:bg-blue-50 px-3 py-1.5 rounded-md border border-gray-200 transition-colors">
-            <AlignLeft className="w-3.5 h-3.5" /> Format
+      <div className="px-3 py-2 border-b border-white/5 flex flex-wrap items-center justify-between gap-2" style={{ background: 'rgba(255,255,255,0.015)' }}>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button onClick={handleFormat} className="text-xs font-medium text-slate-400 hover:text-blue-400 flex items-center gap-1.5 hover:bg-blue-500/10 px-2.5 py-1.5 rounded-md transition-all duration-150 border border-transparent hover:border-blue-500/20">
+            <AlignLeft className="w-3 h-3" /> Format
           </button>
-          <button onClick={handleMinify} className="text-xs font-medium text-gray-600 hover:text-blue-600 flex items-center gap-1.5 bg-white hover:bg-blue-50 px-3 py-1.5 rounded-md border border-gray-200 transition-colors">
-            <Code2 className="w-3.5 h-3.5" /> Minify
+          <button onClick={handleMinify} className="text-xs font-medium text-slate-400 hover:text-blue-400 flex items-center gap-1.5 hover:bg-blue-500/10 px-2.5 py-1.5 rounded-md transition-all duration-150 border border-transparent hover:border-blue-500/20">
+            <Code2 className="w-3 h-3" /> Minify
           </button>
-          <button onClick={handleCopy} className="text-xs font-medium text-gray-600 hover:text-blue-600 flex items-center gap-1.5 bg-white hover:bg-blue-50 px-3 py-1.5 rounded-md border border-gray-200 transition-colors">
-            <Copy className="w-3.5 h-3.5" /> Copy
+          <button onClick={handleCopy} className="text-xs font-medium text-slate-400 hover:text-blue-400 flex items-center gap-1.5 hover:bg-blue-500/10 px-2.5 py-1.5 rounded-md transition-all duration-150 border border-transparent hover:border-blue-500/20">
+            <Copy className="w-3 h-3" /> Copy
           </button>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-2 border-l border-gray-300 pl-3">
-          <span className="text-xs text-gray-500 font-semibold flex items-center gap-1 hidden sm:flex"><LayoutTemplate className="w-3.5 h-3.5"/> Templates:</span>
-          <button onClick={() => setQuery(DEMO_QUERIES.slowJoin)} className="text-[10px] uppercase font-bold tracking-wider text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2 py-1 rounded transition-colors bg-white border border-gray-200">Slow Join</button>
-          <button onClick={() => setQuery(DEMO_QUERIES.subquery)} className="text-[10px] uppercase font-bold tracking-wider text-green-600 hover:text-green-700 hover:bg-green-50 px-2 py-1 rounded transition-colors bg-white border border-gray-200">Subquery</button>
-          <button onClick={() => setQuery(DEMO_QUERIES.missingIndex)} className="text-[10px] uppercase font-bold tracking-wider text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2 py-1 rounded transition-colors bg-white border border-gray-200">Full Scan</button>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-slate-600 font-medium hidden sm:flex items-center gap-1">
+            <LayoutTemplate className="w-3 h-3" /> Examples:
+          </span>
+          <button onClick={() => setQuery(DEMO_QUERIES.slowJoin)} className="text-[10px] uppercase font-bold tracking-wide text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 px-2 py-1 rounded-md transition-all border border-purple-500/15 hover:border-purple-500/30">
+            Slow Join
+          </button>
+          <button onClick={() => setQuery(DEMO_QUERIES.subquery)} className="text-[10px] uppercase font-bold tracking-wide text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 px-2 py-1 rounded-md transition-all border border-emerald-500/15 hover:border-emerald-500/30">
+            Subquery
+          </button>
+          <button onClick={() => setQuery(DEMO_QUERIES.missingIndex)} className="text-[10px] uppercase font-bold tracking-wide text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 px-2 py-1 rounded-md transition-all border border-orange-500/15 hover:border-orange-500/30">
+            Full Scan
+          </button>
         </div>
       </div>
-      
+
       {/* Editor */}
-      <div className="relative flex-1 min-h-0 bg-white">
+      <div className="relative flex-1 min-h-0" style={{ background: '#0a0d14' }}>
         <Editor
           height="100%"
           defaultLanguage="sql"
-          theme="light"
+          theme="vs-dark"
           value={query}
           onChange={(value) => setQuery(value)}
           onMount={handleEditorDidMount}
           options={{
             minimap: { enabled: false },
-            fontSize: 14,
+            fontSize: 13,
             fontFamily: 'JetBrains Mono, monospace',
-            lineHeight: 24,
+            lineHeight: 22,
             padding: { top: 16, bottom: 16 },
             scrollBeyondLastLine: false,
             smoothScrolling: true,
             cursorBlinking: 'smooth',
+            lineNumbers: 'on',
+            renderLineHighlight: 'line',
+            scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
           }}
         />
       </div>

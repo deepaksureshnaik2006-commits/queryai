@@ -19,17 +19,14 @@ export default function Signup() {
       toast.error('Please fill in all fields');
       return;
     }
-    
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
-
     if (password.length < 6) {
       toast.error('Password must be at least 6 characters');
       return;
     }
-    
     setLoading(true);
     try {
       const { error } = await signup(email, password, fullName);
@@ -43,77 +40,83 @@ export default function Signup() {
     }
   };
 
+  const inputClass = "w-full bg-[#0a0d14] border border-white/8 rounded-xl px-4 py-3 text-white text-sm font-medium focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder-slate-600";
+
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 animate-in fade-in zoom-in-95 duration-500 relative z-10">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/20 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
-      <div className="w-full max-w-md">
+    <div className="min-h-[90vh] flex items-center justify-center px-4 py-10 relative" style={{ background: '#030712' }}>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/8 rounded-full blur-[120px] pointer-events-none" />
+      <div className="w-full max-w-sm relative z-10">
+
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0f111a] border border-gray-800 text-blue-500 mb-4 shadow-[0_0_20px_-5px_rgba(59,130,246,0.5)]">
-            <Database className="w-7 h-7" />
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 mb-5 shadow-[0_0_20px_-5px_rgba(59,130,246,0.4)]">
+            <Database className="w-6 h-6 text-blue-400" />
           </div>
-          <h2 className="text-3xl font-black text-white tracking-tight">Create your account</h2>
-          <p className="text-gray-400 font-medium mt-2 text-base">Start optimizing your queries today</p>
+          <h2 className="text-2xl font-black text-white tracking-tight">Create your account</h2>
+          <p className="text-slate-500 text-sm mt-1.5">Start optimizing your queries today — it's free</p>
         </div>
 
-        <div className="bg-[#0f111a]/80 backdrop-blur-xl p-8 rounded-3xl border border-gray-800 shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="bg-[#0a0d14] p-7 rounded-2xl border border-white/8 shadow-2xl">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-bold text-gray-400 mb-1.5">Full Name</label>
-              <input 
-                type="text" 
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Full Name</label>
+              <input
+                type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-[#14161f] border border-gray-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
+                className={inputClass}
                 placeholder="John Doe"
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-400 mb-1.5">Email</label>
-              <input 
-                type="email" 
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Email</label>
+              <input
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#14161f] border border-gray-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
+                className={inputClass}
                 placeholder="you@example.com"
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-400 mb-1.5">Password</label>
-              <input 
-                type="password" 
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Password</label>
+              <input
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#14161f] border border-gray-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
-                placeholder="••••••••"
+                className={inputClass}
+                placeholder="Min. 6 characters"
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-400 mb-1.5">Confirm Password</label>
-              <input 
-                type="password" 
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Confirm Password</label>
+              <input
+                type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-[#14161f] border border-gray-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
+                className={inputClass}
                 placeholder="••••••••"
               />
             </div>
-            
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 mt-8 disabled:opacity-70 shadow-[0_0_20px_-5px_rgba(37,99,235,0.5)] group"
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 mt-2 disabled:opacity-60 shadow-[0_0_20px_-5px_rgba(37,99,235,0.5)] hover:shadow-[0_0_24px_-5px_rgba(37,99,235,0.7)] group text-sm"
             >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Account'}
-              {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                <>Create Account <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" /></>
+              )}
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 font-medium mt-8">
-            Already have an account?{' '}
-            <Link to="/login" className="text-blue-400 font-bold hover:text-blue-300 transition-colors">
-              Sign in
-            </Link>
-          </p>
+          <div className="mt-6 pt-6 border-t border-white/5 text-center">
+            <p className="text-sm text-slate-600">
+              Already have an account?{' '}
+              <Link to="/login" className="text-blue-400 font-semibold hover:text-blue-300 transition-colors">
+                Sign in
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>
