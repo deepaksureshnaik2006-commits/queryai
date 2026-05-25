@@ -20,9 +20,10 @@ export default function History() {
   const fetchHistory = async () => {
     try {
       const data = await getHistory();
-      setHistory(data);
+      setHistory(Array.isArray(data) ? data : []);
     } catch (error) {
       toast.error('Failed to load history');
+      setHistory([]);
     } finally {
       setIsLoading(false);
     }

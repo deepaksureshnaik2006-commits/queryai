@@ -13,7 +13,10 @@ export default function AnalyticsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    getHistory().then(data => { setHistory(data); setIsLoading(false); });
+    getHistory()
+      .then(data => { setHistory(Array.isArray(data) ? data : []); })
+      .catch(() => { setHistory([]); })
+      .finally(() => { setIsLoading(false); });
   }, []);
 
   if (isLoading) {
@@ -99,7 +102,7 @@ export default function AnalyticsDashboard() {
           </h3>
           <p className="text-xs text-slate-600 mb-6 ml-8">Complexity score per query over time</p>
           {activityData.length > 0 ? (
-            <div className="h-[280px]">
+            <div className="h-[280px]" style={{ minWidth: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={activityData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
@@ -134,7 +137,7 @@ export default function AnalyticsDashboard() {
           </h3>
           <p className="text-xs text-slate-600 mb-6 ml-8">Breakdown of risk levels detected</p>
           {history.length > 0 ? (
-            <div className="h-[280px] relative">
+            <div className="h-[280px] relative" style={{ minWidth: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -192,7 +195,7 @@ export default function AnalyticsDashboard() {
             Database Usage
           </h3>
           <p className="text-xs text-slate-600 mb-6 ml-8">Queries run per database engine</p>
-          <div className="h-[200px]">
+          <div className="h-[200px]" style={{ minWidth: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={Object.entries(dbCounts).map(([name, count]) => ({ name, count }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
