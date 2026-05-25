@@ -39,62 +39,299 @@ export default function ResultPanel({ result, originalQuery }) {
     const toastId = toast.loading('Generating PDF...');
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
-      let y = 20;
-      pdf.setFontSize(22);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("QueryAI Optimization Report", 20, y);
-      y += 15;
-      pdf.setFontSize(12);
-      pdf.text(`Complexity Score: ${result.complexity_score}/100`, 20, y); y += 8;
-      pdf.text(`Performance Gain: ${result.performance_gain}`, 20, y); y += 8;
-      pdf.text(`Execution Time: ${result.estimated_execution_time_before} -> ${result.estimated_execution_time_after}`, 20, y); y += 8;
-      pdf.text(`Risk Level: ${result.query_risk_level}`, 20, y); y += 15;
-      pdf.setFontSize(16);
-      pdf.text("AI Strategy & Explanation", 20, y); y += 10;
-      pdf.setFontSize(11);
-      pdf.setFont("helvetica", "normal");
-      const splitExplanation = pdf.splitTextToSize(result.explanation || '', 170);
-      pdf.text(splitExplanation, 20, y);
-      y += (splitExplanation.length * 6) + 10;
-      if (y > 270) { pdf.addPage(); y = 20; }
-      if (result.issues_found && result.issues_found.length > 0) {
-        pdf.setFontSize(16); pdf.setFont("helvetica", "bold");
-        pdf.text("Detected Bottlenecks", 20, y); y += 10;
-        pdf.setFontSize(11); pdf.setFont("helvetica", "normal");
-        result.issues_found.forEach(issue => {
-          const s = pdf.splitTextToSize(`• ${issue}`, 170);
-          if (y > 280) { pdf.addPage(); y = 20; }
-          pdf.text(s, 20, y); y += (s.length * 6) + 2;
-        });
+      const W = 210;
+      const MARGIN = 20;
+      const CONTENT_W = W - MARGIN * 2;
+      const generatedAt = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
+
+      const checkPage = (needed = 20) => {
+        if (y + needed > 275) { pdf.addPage(); drawPageFooter(); y = 24; }
+      };
+
+      const drawPageFooter = () => {
+        const pageCount = pdf.internal.getNumberOfPages();
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(150, 150, 160);
+        pdf.text('QueryAI Optimization Report', MARGIN, 289);
+        pdf.text(`Page ${pageCount}`, W - MARGIN, 289, { align: 'right' });
+        pdf.setDrawColor(220, 220, 230);
+        pdf.setLineWidth(0.3);
+        pdf.line(MARGIN, 285, W - MARGIN, 285);
+      };
+
+      const sectionHeader = (title) => {
+        checkPage(18);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(11);
+        pdf.setTextColor(30, 30, 40);
+        pdf.text(title.toUpperCase(), MARGIN, y);
+        pdf.setDrawColor(59, 130, 246);
+        pdf.setLineWidth(0.8);
+        pdf.line(MARGIN, y + 2, MARGIN + 30, y + 2);
+        pdf.setLineWidth(0.2);
+        pdf.setDrawColor(220, 220, 230);
+        pdf.line(MARGIN + 31, y + 2, W - MARGIN, y + 2);
         y += 10;
+      };
+
+      const bodyText = (text, color = [55, 65, 81]) => {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.setTextColor(...color);
+        const lines = pdf.splitTextToSize(text, CONTENT_W - 4);
+        checkPage(lines.length * 5.5 + 4);
+        pdf.text(lines, MARGIN + 2, y);
+        y += lines.length * 5.5 + 3;
+      };
+
+      let y = 0;
+
+      // ── COVER HEADER ─────────────────────────────────────────────
+      pdf.setFillColor(10, 13, 20);
+      pdf.rect(0, 0, W, 48, 'F');
+      pdf.setFillColor(59, 130, 246);
+      pdf.rect(0, 48, W, 1.5, 'F');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(20);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('QueryAI', MARGIN, 22);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text('SQL Optimization Report', MARGIN, 31);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(`Generated: ${generatedAt}`, MARGIN, 43);
+
+      const riskLevelText = result.query_risk_level || 'Unknown';
+      const riskBadgeX = W - MARGIN - 36;
+      const riskColor =
+        riskLevelText === 'Critical' ? [239, 68, 68] :
+        riskLevelText === 'High'     ? [249, 115, 22] :
+        riskLevelText === 'Medium'   ? [234, 179, 8] :
+                                       [34, 197, 94];
+      pdf.setFillColor(...riskColor);
+      pdf.roundedRect(riskBadgeX, 33, 36, 8, 2, 2, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text(`${riskLevelText} Risk`, riskBadgeX + 18, 38.5, { align: 'center' });
+
+      y = 60;
+
+      // ── KPI CARDS ────────────────────────────────────────────────
+      const kpis = [
+        { label: 'Complexity Score', value: `${result.complexity_score || 0}/100`, rgb: [59, 130, 246] },
+        { label: 'Performance Gain', value: result.performance_gain || 'N/A', rgb: [34, 197, 94] },
+        { label: 'Time Before', value: result.estimated_execution_time_before || 'N/A', rgb: [239, 68, 68] },
+        { label: 'Time After', value: result.estimated_execution_time_after || 'N/A', rgb: [34, 197, 94] },
+      ];
+      const cardW = (CONTENT_W - 9) / 4;
+      kpis.forEach((k, i) => {
+        const cx = MARGIN + i * (cardW + 3);
+        pdf.setFillColor(245, 247, 250);
+        pdf.roundedRect(cx, y, cardW, 22, 2, 2, 'F');
+        pdf.setFillColor(...k.rgb);
+        pdf.roundedRect(cx, y, cardW, 2.5, 2, 2, 'F');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(13);
+        pdf.setTextColor(...k.rgb);
+        pdf.text(k.value, cx + cardW / 2, y + 13, { align: 'center' });
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(k.label, cx + cardW / 2, y + 19, { align: 'center' });
+      });
+      y += 30;
+
+      // ── AI EXPLANATION ───────────────────────────────────────────
+      sectionHeader('AI Strategy & Explanation');
+      pdf.setFillColor(239, 246, 255);
+      const explanationLines = pdf.splitTextToSize(result.explanation || 'No explanation provided.', CONTENT_W - 8);
+      checkPage(explanationLines.length * 5.5 + 10);
+      pdf.roundedRect(MARGIN, y - 3, CONTENT_W, explanationLines.length * 5.5 + 8, 2, 2, 'F');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(30, 58, 138);
+      pdf.text(explanationLines, MARGIN + 4, y + 2);
+      y += explanationLines.length * 5.5 + 12;
+
+      // ── ORIGINAL QUERY ───────────────────────────────────────────
+      if (originalQuery) {
+        checkPage(16);
+        sectionHeader('Original Query');
+        const origLines = pdf.splitTextToSize(originalQuery, CONTENT_W - 8);
+        checkPage(origLines.length * 5 + 10);
+        pdf.setFillColor(248, 248, 252);
+        pdf.roundedRect(MARGIN, y - 3, CONTENT_W, origLines.length * 5 + 8, 2, 2, 'F');
+        pdf.setDrawColor(200, 200, 210);
+        pdf.setLineWidth(0.3);
+        pdf.roundedRect(MARGIN, y - 3, CONTENT_W, origLines.length * 5 + 8, 2, 2, 'D');
+        pdf.setFont('courier', 'normal');
+        pdf.setFontSize(9);
+        pdf.setTextColor(60, 60, 80);
+        pdf.text(origLines, MARGIN + 4, y + 2);
+        y += origLines.length * 5 + 14;
       }
-      if (y > 270) { pdf.addPage(); y = 20; }
+
+      // ── OPTIMIZED QUERY ──────────────────────────────────────────
+      if (result.optimized_query) {
+        checkPage(16);
+        sectionHeader('Optimized Query');
+        const optLines = pdf.splitTextToSize(result.optimized_query, CONTENT_W - 8);
+        checkPage(optLines.length * 5 + 10);
+        pdf.setFillColor(240, 253, 244);
+        pdf.roundedRect(MARGIN, y - 3, CONTENT_W, optLines.length * 5 + 8, 2, 2, 'F');
+        pdf.setDrawColor(34, 197, 94);
+        pdf.setLineWidth(0.5);
+        pdf.line(MARGIN, y - 3, MARGIN, y - 3 + optLines.length * 5 + 8);
+        pdf.setFont('courier', 'normal');
+        pdf.setFontSize(9);
+        pdf.setTextColor(20, 83, 45);
+        pdf.text(optLines, MARGIN + 5, y + 2);
+        y += optLines.length * 5 + 14;
+      }
+
+      // ── DETECTED BOTTLENECKS ─────────────────────────────────────
+      if (result.issues_found && result.issues_found.length > 0) {
+        checkPage(16);
+        sectionHeader('Detected Bottlenecks');
+        result.issues_found.forEach((issue) => {
+          const lines = pdf.splitTextToSize(issue, CONTENT_W - 14);
+          checkPage(lines.length * 5.5 + 8);
+          pdf.setFillColor(255, 247, 237);
+          pdf.roundedRect(MARGIN, y - 2, CONTENT_W, lines.length * 5.5 + 6, 2, 2, 'F');
+          pdf.setFillColor(249, 115, 22);
+          pdf.circle(MARGIN + 5, y + lines.length * 2.5, 1.5, 'F');
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(10);
+          pdf.setTextColor(124, 45, 18);
+          pdf.text(lines, MARGIN + 10, y + 2);
+          y += lines.length * 5.5 + 8;
+        });
+        y += 4;
+      }
+
+      // ── SECURITY RISKS ───────────────────────────────────────────
       if (result.detected_risks && result.detected_risks.length > 0) {
-        pdf.setFontSize(16); pdf.setFont("helvetica", "bold");
-        pdf.text("Security & Logic Risks", 20, y); y += 10;
-        pdf.setFontSize(11); pdf.setFont("helvetica", "normal");
-        result.detected_risks.forEach(risk => {
-          const s = pdf.splitTextToSize(`! ${risk}`, 170);
-          if (y > 280) { pdf.addPage(); y = 20; }
-          pdf.text(s, 20, y); y += (s.length * 6) + 2;
+        checkPage(16);
+        sectionHeader('Security & Logic Risks');
+        result.detected_risks.forEach((risk) => {
+          const lines = pdf.splitTextToSize(risk, CONTENT_W - 14);
+          checkPage(lines.length * 5.5 + 8);
+          pdf.setFillColor(254, 242, 242);
+          pdf.roundedRect(MARGIN, y - 2, CONTENT_W, lines.length * 5.5 + 6, 2, 2, 'F');
+          pdf.setFillColor(239, 68, 68);
+          pdf.rect(MARGIN, y - 2, 2.5, lines.length * 5.5 + 6, 'F');
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(10);
+          pdf.setTextColor(127, 29, 29);
+          pdf.text(lines, MARGIN + 7, y + 2);
+          y += lines.length * 5.5 + 8;
+        });
+        y += 4;
+      }
+
+      // ── INDEX RECOMMENDATIONS ────────────────────────────────────
+      if (result.index_sql && result.index_sql.length > 0) {
+        checkPage(16);
+        sectionHeader('Recommended Indexes');
+        result.index_sql.forEach((sql, i) => {
+          const lines = pdf.splitTextToSize(sql, CONTENT_W - 10);
+          checkPage(lines.length * 5 + 12);
+          pdf.setFillColor(245, 243, 255);
+          pdf.roundedRect(MARGIN, y - 2, CONTENT_W, lines.length * 5 + 8, 2, 2, 'F');
+          pdf.setDrawColor(139, 92, 246);
+          pdf.setLineWidth(0.4);
+          pdf.roundedRect(MARGIN, y - 2, CONTENT_W, lines.length * 5 + 8, 2, 2, 'D');
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(7.5);
+          pdf.setTextColor(109, 40, 217);
+          pdf.text(`INDEX ${i + 1}`, MARGIN + 3, y + 2);
+          pdf.setFont('courier', 'normal');
+          pdf.setFontSize(9);
+          pdf.setTextColor(76, 29, 149);
+          pdf.text(lines, MARGIN + 4, y + 7);
+          y += lines.length * 5 + 14;
         });
       }
-      pdf.save('query-optimization-report.pdf');
-      toast.success('PDF Downloaded', { id: toastId });
+
+      // ── INDEX SUGGESTIONS (text) ─────────────────────────────────
+      if (result.index_suggestions && result.index_suggestions.length > 0) {
+        checkPage(16);
+        sectionHeader('Index Strategy Notes');
+        result.index_suggestions.forEach((note) => {
+          bodyText(`→  ${note}`, [75, 85, 99]);
+        });
+        y += 4;
+      }
+
+      // ── FOOTER on all pages ──────────────────────────────────────
+      const totalPages = pdf.internal.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        pdf.setPage(p);
+        drawPageFooter();
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(150, 150, 160);
+        pdf.text(`Page ${p} of ${totalPages}`, W - MARGIN, 289, { align: 'right' });
+      }
+
+      const slug = new Date().toISOString().slice(0, 10);
+      pdf.save(`queryai-report-${slug}.pdf`);
+      toast.success('PDF report downloaded', { id: toastId });
     } catch (e) {
+      console.error(e);
       toast.error('Failed to export PDF', { id: toastId });
     }
   };
 
   const handleExportJSON = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(result, null, 2));
+    const reportId = Math.random().toString(36).slice(2, 10).toUpperCase();
+    const report = {
+      meta: {
+        report_id: reportId,
+        generated_by: 'QueryAI',
+        generated_at: new Date().toISOString(),
+        version: '2.0',
+      },
+      summary: {
+        complexity_score: result.complexity_score ?? null,
+        performance_gain: result.performance_gain ?? null,
+        query_risk_level: result.query_risk_level ?? null,
+        estimated_execution_time: {
+          before: result.estimated_execution_time_before ?? null,
+          after: result.estimated_execution_time_after ?? null,
+        },
+      },
+      queries: {
+        original: originalQuery || null,
+        optimized: result.optimized_query || null,
+      },
+      analysis: {
+        explanation: result.explanation || null,
+        issues_found: result.issues_found || [],
+        detected_risks: result.detected_risks || [],
+      },
+      indexes: {
+        suggestions: result.index_suggestions || [],
+        sql_statements: result.index_sql || [],
+      },
+    };
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(report, null, 2));
     const a = document.createElement('a');
-    a.setAttribute("href", dataStr);
-    a.setAttribute("download", "optimization-data.json");
+    const slug = new Date().toISOString().slice(0, 10);
+    a.setAttribute('href', dataStr);
+    a.setAttribute('download', `queryai-report-${slug}.json`);
     document.body.appendChild(a);
     a.click();
     a.remove();
-    toast.success('JSON Downloaded');
+    toast.success('JSON report downloaded');
   };
 
   const getRiskColor = (level) => {
