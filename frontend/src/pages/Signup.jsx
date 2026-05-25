@@ -40,7 +40,7 @@ export default function Signup() {
     }
   };
 
-  const inputClass = "w-full bg-[#0a0d14] border border-white/8 rounded-xl px-4 py-3 text-white text-sm font-medium focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder-slate-600";
+  const inputClass = "w-full bg-[#0a0d14] border border-white/8 rounded-xl px-4 py-3 text-white text-sm font-medium focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all";
 
   return (
     <div className="min-h-[90vh] flex items-center justify-center px-4 py-10 relative" style={{ background: '#030712' }}>
@@ -64,7 +64,7 @@ export default function Signup() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className={inputClass}
-                placeholder="John Doe"
+                autoComplete="name"
               />
             </div>
             <div>
@@ -74,7 +74,7 @@ export default function Signup() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={inputClass}
-                placeholder="you@example.com"
+                autoComplete="email"
               />
             </div>
             <div>
@@ -84,7 +84,7 @@ export default function Signup() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={inputClass}
-                placeholder="Min. 6 characters"
+                autoComplete="new-password"
               />
             </div>
             <div>
@@ -94,7 +94,7 @@ export default function Signup() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className={inputClass}
-                placeholder="••••••••"
+                autoComplete="new-password"
               />
             </div>
 

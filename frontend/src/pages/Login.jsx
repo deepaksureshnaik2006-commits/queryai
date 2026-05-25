@@ -30,7 +30,7 @@ export default function Login() {
     }
   };
 
-  const inputClass = "w-full bg-[#0a0d14] border border-white/8 rounded-xl px-4 py-3 text-white text-sm font-medium focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder-slate-600";
+  const inputClass = "w-full bg-[#0a0d14] border border-white/8 rounded-xl px-4 py-3 text-white text-sm font-medium focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all";
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 relative" style={{ background: '#030712' }}>
@@ -54,7 +54,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={inputClass}
-                placeholder="you@example.com"
+                autoComplete="email"
               />
             </div>
             <div>
@@ -64,7 +64,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={inputClass}
-                placeholder="••••••••"
+                autoComplete="current-password"
               />
             </div>
 
