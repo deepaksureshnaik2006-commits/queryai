@@ -12,48 +12,38 @@ import SharedQuery from './pages/SharedQuery';
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
   return children;
 };
 
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-dark-900 text-gray-100 font-sans">
+      <div className="min-h-screen" style={{ background: '#030712', color: '#e2e8f0' }}>
         <Navbar />
-        <main className="container mx-auto px-4 py-8 max-w-6xl">
+        <main>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/share/:id" element={<SharedQuery />} />
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/history" 
-              element={
-                <ProtectedRoute>
-                  <History />
-                </ProtectedRoute>
-              } 
-            />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
           </Routes>
         </main>
-        <Toaster position="bottom-right" toastOptions={{
-          style: {
-            background: '#1a1a1a',
-            color: '#fff',
-            border: '1px solid rgba(255,255,255,0.1)'
-          }
-        }} />
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: '#0f111a',
+              color: '#e2e8f0',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: 500,
+            },
+          }}
+        />
       </div>
     </Router>
   );
