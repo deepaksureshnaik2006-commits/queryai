@@ -273,20 +273,39 @@ export default function ResultPanel({ result, originalQuery, explanationLevel })
       if (result.index_sql?.length > 0) {
         sectionHeader('Recommended Indexes');
         result.index_sql.forEach((sql, i) => {
-          checkPage(16);
+          checkPage(20);
+          // Index label
           pdf.setFont('helvetica', 'bold');
           pdf.setFontSize(7.5);
           pdf.setTextColor(...MIDTEXT);
-          pdf.text(`Index ${i + 1}`, M, y);
+          pdf.text(`INDEX ${i + 1}`, M, y);
           y += 4;
+          // SQL block with green accent
           codeBlock(sql, GREEN);
+          // Paired explanation (if available)
+          const note = result.index_suggestions?.[i];
+          if (note) {
+            const noteLines = pdf.splitTextToSize(`→  ${note}`, CW - 6);
+            const noteH = noteLines.length * 4.8 + 6;
+            checkPage(noteH + 2);
+            pdf.setFillColor(240, 247, 240);
+            pdf.setDrawColor(180, 210, 185);
+            pdf.setLineWidth(0.2);
+            pdf.roundedRect(M, y, CW, noteH, 1.5, 1.5, 'FD');
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(8.5);
+            pdf.setTextColor(30, 90, 50);
+            pdf.text(noteLines, M + 4, y + 5);
+            y += noteH + 4;
+          }
+          y += 2;
         });
-      }
-
-      // ── INDEX NOTES ──────────────────────────────────────────────────
-      if (result.index_suggestions?.length > 0) {
-        sectionHeader('Index Strategy Notes');
-        result.index_suggestions.forEach((note) => bulletRow(note, '→', BLUE));
+        // Any extra notes beyond the SQL count
+        if (result.index_suggestions?.length > result.index_sql.length) {
+          y += 2;
+          sectionHeader('Additional Index Notes');
+          result.index_suggestions.slice(result.index_sql.length).forEach((note) => bulletRow(note, '→', BLUE));
+        }
         y += 2;
       }
 
@@ -512,31 +531,65 @@ export default function ResultPanel({ result, originalQuery, explanationLevel })
 
           {/* INDEXES */}
           {activeTab === 'indexes' && (
-            <div className="max-w-4xl">
+            <div className="max-w-4xl space-y-6">
               {result.index_sql && result.index_sql.length > 0 ? (
-                <section>
-                  <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                <>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
                     <div className="w-5 h-5 rounded bg-purple-500/15 flex items-center justify-center">
                       <Database className="w-3 h-3 text-purple-400" />
                     </div>
                     Recommended Indexes
+                    <span className="ml-auto text-xs font-normal text-slate-500">{result.index_sql.length} index{result.index_sql.length !== 1 ? 'es' : ''}</span>
                   </h4>
-                  <div className="space-y-3">
-                    {result.index_sql.map((sql, i) => (
-                      <div key={i} className="relative bg-purple-500/5 border border-purple-500/15 rounded-xl overflow-hidden group">
-                        <pre className="text-xs font-mono text-purple-300 overflow-x-auto p-4 pr-14 leading-relaxed">
-                          {format(sql || '', { language: 'postgresql' })}
-                        </pre>
-                        <button
-                          onClick={() => handleCopy(sql, 'index', i)}
-                          className="absolute top-3 right-3 text-xs font-semibold flex items-center gap-1 text-slate-400 hover:text-purple-300 transition-all bg-[#0a0d14] p-2 rounded-lg border border-white/10 opacity-0 group-hover:opacity-100"
-                        >
-                          {copiedIndex === i ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    ))}
+
+                  <div className="space-y-5">
+                    {result.index_sql.map((sql, i) => {
+                      const explanation = result.index_suggestions?.[i];
+                      return (
+                        <div key={i} className="rounded-2xl border border-white/8 overflow-hidden">
+                          {/* Index header */}
+                          <div className="flex items-center gap-2 px-4 py-2.5 bg-purple-500/6 border-b border-white/6">
+                            <span className="text-[10px] font-bold text-purple-400 tracking-widest uppercase">Index {i + 1}</span>
+                          </div>
+
+                          {/* SQL block */}
+                          <div className="relative group bg-[#0d1117]">
+                            <pre className="text-xs font-mono text-purple-200 overflow-x-auto p-4 pr-14 leading-relaxed">
+                              {format(sql || '', { language: 'postgresql' })}
+                            </pre>
+                            <button
+                              onClick={() => handleCopy(sql, 'index', i)}
+                              className="absolute top-3 right-3 text-xs font-semibold flex items-center gap-1 text-slate-400 hover:text-purple-300 transition-all bg-[#0a0d14] p-2 rounded-lg border border-white/10 opacity-0 group-hover:opacity-100"
+                            >
+                              {copiedIndex === i ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+
+                          {/* Explanation */}
+                          {explanation && (
+                            <div className="px-4 py-3 bg-white/2 border-t border-white/6 flex items-start gap-2.5">
+                              <Info className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                              <p className="text-xs text-slate-400 leading-relaxed">{explanation}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                </section>
+
+                  {/* Extra strategy notes that don't pair 1:1 with SQL blocks */}
+                  {result.index_suggestions && result.index_suggestions.length > result.index_sql.length && (
+                    <section className="bg-blue-500/5 border border-blue-500/15 rounded-xl p-4 space-y-2">
+                      <h5 className="text-xs font-bold text-blue-400 mb-2">Additional Strategy Notes</h5>
+                      {result.index_suggestions.slice(result.index_sql.length).map((note, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs text-slate-400">
+                          <span className="text-blue-400 shrink-0 mt-0.5">→</span>
+                          {note}
+                        </div>
+                      ))}
+                    </section>
+                  )}
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-white/8 rounded-2xl">
                   <div className="w-12 h-12 rounded-2xl bg-white/4 flex items-center justify-center mb-4">

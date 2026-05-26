@@ -1,12 +1,12 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Database, BrainCircuit, Activity, Zap, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const steps = [
-  { icon: Database, text: 'Analyzing query structure...' },
-  { icon: Activity, text: 'Detecting bottlenecks & full scans...' },
+  { icon: Database,     text: 'Analyzing query structure...' },
+  { icon: Activity,     text: 'Detecting bottlenecks & full scans...' },
   { icon: BrainCircuit, text: 'Generating optimized execution path...' },
-  { icon: Zap, text: 'Finalizing rewrite & extracting indexes...' },
+  { icon: Zap,          text: 'Finalizing rewrite & extracting indexes...' },
 ];
 
 export default function LoadingAnimation() {
@@ -15,7 +15,7 @@ export default function LoadingAnimation() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentStep((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
-    }, 2000);
+    }, 1400);
     return () => clearInterval(interval);
   }, []);
 
@@ -45,41 +45,43 @@ export default function LoadingAnimation() {
       <div className="space-y-3 w-full max-w-xs">
         {steps.map((step, index) => {
           const isActive = index === currentStep;
-          const isPast = index < currentStep;
+          const isPast   = index < currentStep;
+          const isFuture = index > currentStep;
 
           return (
             <motion.div
               key={index}
-              initial={{ opacity: 0, x: -10 }}
               animate={{
-                opacity: isActive || isPast ? 1 : 0.25,
-                x: isActive || isPast ? 0 : -10,
+                opacity: isFuture ? 0.35 : 1,
               }}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+              transition={{ duration: 0.45, ease: 'easeOut' }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors duration-300 ${
                 isActive
-                  ? 'bg-blue-500/8 border-blue-500/20'
+                  ? 'bg-blue-500/8 border-blue-500/25'
                   : isPast
                   ? 'bg-emerald-500/5 border-emerald-500/15'
-                  : 'bg-transparent border-transparent'
+                  : 'bg-transparent border-white/6'
               }`}
             >
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-300 ${
                 isActive ? 'bg-blue-500/15 text-blue-400' :
-                isPast ? 'bg-emerald-500/15 text-emerald-400' :
-                'bg-white/4 text-slate-600'
+                isPast   ? 'bg-emerald-500/15 text-emerald-400' :
+                           'bg-white/4 text-slate-500'
               }`}>
                 {isPast
                   ? <Check className="w-4 h-4" />
                   : <step.icon className="w-4 h-4" />
                 }
               </div>
-              <span className={`text-xs font-medium ${
+
+              <span className={`text-xs font-medium transition-colors duration-300 ${
                 isActive ? 'text-blue-300' :
-                isPast ? 'text-emerald-400' :
-                'text-slate-600'
+                isPast   ? 'text-emerald-400' :
+                           'text-slate-500'
               }`}>
                 {step.text}
               </span>
+
               {isActive && (
                 <div className="ml-auto flex gap-0.5">
                   {[0, 1, 2].map(i => (
