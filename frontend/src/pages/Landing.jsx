@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   ArrowRight, Zap, Activity, Database, CheckCircle2, ShieldCheck, Code2,
-  TrendingUp, Lock, BarChart3, Search, GitBranch, Layers, Clock, Star,
+  TrendingUp, BarChart3, Search, GitBranch, Layers, Clock, Star,
   ChevronRight, Terminal, Cpu, Globe
 } from 'lucide-react';
 
@@ -152,10 +152,6 @@ export default function Landing() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2 mt-6 text-xs text-slate-600">
-            <Lock className="w-3.5 h-3.5" />
-            No credit card required · Free forever plan
-          </div>
         </div>
 
         {/* Right: code demo */}
