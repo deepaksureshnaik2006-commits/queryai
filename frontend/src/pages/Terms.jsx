@@ -59,7 +59,7 @@ export default function Terms() {
 
           <section>
             <h2 className="text-base font-bold text-white mb-3">8. Contact</h2>
-            <p>Questions about these Terms of Service? Contact us at <span className="text-blue-400">legal@queryai.dev</span>.</p>
+            <p>Questions about these Terms of Service? Contact us at <span className="text-blue-400">team.queryai564@gmail.com</span>.</p>
           </section>
 
         </div>

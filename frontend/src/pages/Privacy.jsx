@@ -54,7 +54,7 @@ export default function Privacy() {
 
           <section>
             <h2 className="text-base font-bold text-white mb-3">7. Contact</h2>
-            <p>If you have any questions about this Privacy Policy, please contact us at <span className="text-blue-400">privacy@queryai.dev</span>.</p>
+            <p>If you have any questions about this Privacy Policy, please contact us at <span className="text-blue-400">team.queryai564@gmail.com</span>.</p>
           </section>
 
         </div>
