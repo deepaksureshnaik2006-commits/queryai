@@ -119,10 +119,6 @@ export default function Landing() {
 
         {/* Left */}
         <div className="w-full md:w-1/2 flex flex-col items-center md:items-start text-center md:text-left z-10">
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-semibold text-xs uppercase tracking-widest mb-7 w-fit">
-            <Zap className="w-3.5 h-3.5 fill-blue-400" />
-            Query Optimizer Engine 2.0
-          </div>
 
           <h1 className="text-5xl lg:text-6xl xl:text-[68px] font-black tracking-tight mb-5 text-white leading-[1.06]">
             Supercharge<br />
