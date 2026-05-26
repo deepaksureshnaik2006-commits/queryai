@@ -79,7 +79,7 @@ export default function Dashboard() {
                 {isLoading ? (
                   <LoadingAnimation />
                 ) : (
-                  <ResultPanel result={result} originalQuery={originalQuery} />
+                  <ResultPanel result={result} originalQuery={originalQuery} explanationLevel={explanationLevel} />
                 )}
               </div>
             </div>

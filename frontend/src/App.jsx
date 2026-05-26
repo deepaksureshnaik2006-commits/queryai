@@ -9,6 +9,9 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
 import SharedQuery from './pages/SharedQuery';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
+import Docs from './pages/Docs';
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -27,6 +30,9 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/share/:id" element={<SharedQuery />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/docs" element={<Docs />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
           </Routes>

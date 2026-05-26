@@ -5,7 +5,16 @@ import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 import { format } from 'sql-formatter';
 
-export default function ResultPanel({ result, originalQuery }) {
+const LEVEL_META = {
+  beginner:      { label: 'Beginner',     color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25' },
+  intermediate:  { label: 'Intermediate', color: 'text-blue-400 bg-blue-500/10 border-blue-500/25' },
+  expert:        { label: 'Expert',        color: 'text-red-400 bg-red-500/10 border-red-500/25' },
+  'dba expert':  { label: 'DBA Expert',   color: 'text-red-400 bg-red-500/10 border-red-500/25' },
+};
+
+const getLevelMeta = (level) => LEVEL_META[(level || '').toLowerCase()] || LEVEL_META.intermediate;
+
+export default function ResultPanel({ result, originalQuery, explanationLevel }) {
   const [copied, setCopied] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [activeTab, setActiveTab] = useState('diff');
@@ -40,24 +49,33 @@ export default function ResultPanel({ result, originalQuery }) {
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const W = 210;
-      const MARGIN = 18;
-      const CW = W - MARGIN * 2;
+      const M = 18;
+      const CW = W - M * 2;
       const generatedAt = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
       let y = 0;
 
-      const DARK   = [15, 23, 42];
-      const MID    = [71, 85, 105];
-      const LIGHT  = [148, 163, 184];
+      // ── Color palette ──────────────────────────────────────────────
+      const NAVY   = [15, 33, 65];
+      const DKGRAY = [30, 41, 59];
+      const MIDGRAY= [71, 85, 105];
+      const LTGRAY = [148, 163, 184];
       const RULE   = [226, 232, 240];
+      const PAGBG  = [255, 255, 255];
+      const CARDBG = [248, 250, 252];
       const BLUE   = [37, 99, 235];
+      const LTBLUE = [96, 165, 250];
       const GREEN  = [22, 163, 74];
       const RED    = [220, 38, 38];
       const ORANGE = [234, 88, 12];
+      const PURPLE = [124, 58, 237];
 
+      // ── Helpers ────────────────────────────────────────────────────
       const checkPage = (need = 18) => {
         if (y + need > 274) {
           pdf.addPage();
-          y = MARGIN;
+          pdf.setFillColor(...PAGBG);
+          pdf.rect(0, 0, W, 297, 'F');
+          y = M + 4;
           drawFooter();
         }
       };
@@ -66,210 +84,230 @@ export default function ResultPanel({ result, originalQuery }) {
         const pg = pdf.internal.getNumberOfPages();
         pdf.setDrawColor(...RULE);
         pdf.setLineWidth(0.25);
-        pdf.line(MARGIN, 284, W - MARGIN, 284);
+        pdf.line(M, 284, W - M, 284);
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(7.5);
-        pdf.setTextColor(...LIGHT);
-        pdf.text('QueryAI · SQL Optimization Report', MARGIN, 289);
-        pdf.text(`Page ${pg}`, W - MARGIN, 289, { align: 'right' });
+        pdf.setTextColor(...LTGRAY);
+        pdf.text('QueryAI — SQL Optimization Report', M, 289.5);
+        pdf.text(`Page ${pg}`, W - M, 289.5, { align: 'right' });
       };
 
-      const sectionTitle = (title) => {
-        checkPage(16);
-        y += 2;
+      const sectionHeader = (title) => {
+        checkPage(18);
+        y += 3;
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(9.5);
-        pdf.setTextColor(...BLUE);
-        pdf.text(title.toUpperCase(), MARGIN, y);
-        y += 1.5;
+        pdf.setFontSize(9);
+        pdf.setTextColor(...NAVY);
+        pdf.text(title.toUpperCase(), M, y);
+        const tw = pdf.getTextWidth(title.toUpperCase());
+        y += 2;
+        pdf.setDrawColor(...BLUE);
+        pdf.setLineWidth(1.2);
+        pdf.line(M, y, M + tw + 2, y);
         pdf.setDrawColor(...RULE);
-        pdf.setLineWidth(0.3);
-        pdf.line(MARGIN, y + 1, W - MARGIN, y + 1);
+        pdf.setLineWidth(0.25);
+        pdf.line(M + tw + 4, y, W - M, y);
         y += 7;
       };
 
-      const paragraph = (text, indent = 0, color = DARK) => {
+      const bodyText = (text, indent = 0, color = DKGRAY, size = 9.5) => {
         pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9.5);
+        pdf.setFontSize(size);
         pdf.setTextColor(...color);
-        const lines = pdf.splitTextToSize(text, CW - indent);
-        checkPage(lines.length * 5 + 3);
-        pdf.text(lines, MARGIN + indent, y);
-        y += lines.length * 5 + 3;
+        const lines = pdf.splitTextToSize(text, CW - indent - 2);
+        checkPage(lines.length * 5.2 + 3);
+        pdf.text(lines, M + indent, y);
+        y += lines.length * 5.2 + 2;
       };
 
-      const codeBlock = (text) => {
-        const lines = pdf.splitTextToSize(text, CW - 8);
-        const blockH = lines.length * 4.8 + 7;
+      const formatSQL = (sql) => {
+        try {
+          return format(sql || '', { language: 'postgresql', tabWidth: 2, keywordCase: 'upper', linesBetweenQueries: 1 });
+        } catch { return sql || ''; }
+      };
+
+      const codeBlock = (sql, accentColor = null) => {
+        const formatted = formatSQL(sql);
+        const lines = pdf.splitTextToSize(formatted, CW - 10);
+        const blockH = Math.max(lines.length * 4.6 + 8, 14);
         checkPage(blockH + 4);
-        pdf.setFillColor(248, 250, 252);
+        pdf.setFillColor(...CARDBG);
         pdf.setDrawColor(...RULE);
         pdf.setLineWidth(0.3);
-        pdf.roundedRect(MARGIN, y, CW, blockH, 1.5, 1.5, 'FD');
+        pdf.roundedRect(M, y, CW, blockH, 1.5, 1.5, 'FD');
+        if (accentColor) {
+          pdf.setFillColor(...accentColor);
+          pdf.rect(M, y, 2, blockH, 'F');
+        }
         pdf.setFont('courier', 'normal');
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(30, 41, 59);
-        pdf.text(lines, MARGIN + 4, y + 5.5);
+        pdf.setFontSize(8);
+        pdf.setTextColor(...DKGRAY);
+        const startX = accentColor ? M + 5 : M + 4;
+        pdf.text(lines, startX, y + 5.5);
         y += blockH + 5;
       };
 
-      const bulletRow = (text, accentColor = MID) => {
+      const accentRow = (text, dotColor = MIDGRAY) => {
         const lines = pdf.splitTextToSize(text, CW - 8);
-        const rowH = lines.length * 5 + 5;
-        checkPage(rowH + 3);
-        pdf.setDrawColor(...RULE);
-        pdf.setLineWidth(0.25);
-        pdf.line(MARGIN, y, MARGIN, y + rowH - 1);
-        pdf.setFillColor(...accentColor);
-        pdf.rect(MARGIN, y, 1.2, rowH - 1, 'F');
+        const rowH = lines.length * 5 + 6;
+        checkPage(rowH + 2);
+        pdf.setFillColor(...dotColor);
+        pdf.rect(M, y + 1, 1.8, rowH - 3, 'F');
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(9.5);
-        pdf.setTextColor(...DARK);
-        pdf.text(lines, MARGIN + 5, y + 4);
-        y += rowH + 2;
+        pdf.setTextColor(...DKGRAY);
+        pdf.text(lines, M + 5, y + 4.5);
+        pdf.setDrawColor(...RULE);
+        pdf.setLineWidth(0.2);
+        pdf.line(M, y + rowH, W - M, y + rowH);
+        y += rowH + 1;
       };
 
-      // ─── HEADER ────────────────────────────────────────────────
-      pdf.setFillColor(15, 23, 42);
-      pdf.rect(0, 0, W, 40, 'F');
+      // ── White page background ──────────────────────────────────────
+      pdf.setFillColor(...PAGBG);
+      pdf.rect(0, 0, W, 297, 'F');
 
+      // ── COVER HEADER ──────────────────────────────────────────────
+      pdf.setFillColor(...NAVY);
+      pdf.rect(0, 0, W, 44, 'F');
       pdf.setFillColor(...BLUE);
-      pdf.rect(0, 40, W, 1, 'F');
+      pdf.rect(0, 44, W, 1.5, 'F');
 
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(22);
+      pdf.setFontSize(24);
       pdf.setTextColor(255, 255, 255);
-      pdf.text('QueryAI', MARGIN, 19);
+      pdf.text('QueryAI', M, 20);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9.5);
-      pdf.setTextColor(...LIGHT);
-      pdf.text('SQL Optimization Report', MARGIN, 27);
+      pdf.setTextColor(...LTBLUE);
+      pdf.text('SQL Optimization Report', M, 29);
 
-      pdf.setFontSize(8);
-      pdf.setTextColor(100, 116, 139);
-      pdf.text(`Generated: ${generatedAt}`, MARGIN, 36);
-
-      // Risk badge (text only, top-right)
-      const riskText = result.query_risk_level || 'Unknown';
-      const riskColor =
-        riskText === 'Critical' ? RED :
-        riskText === 'High'     ? ORANGE :
-        riskText === 'Medium'   ? [180, 130, 0] :
-                                  GREEN;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9);
-      pdf.setTextColor(...riskColor);
-      pdf.text(`${riskText} Risk`, W - MARGIN, 19, { align: 'right' });
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7.5);
-      pdf.setTextColor(...LIGHT);
-      pdf.text('Risk Level', W - MARGIN, 27, { align: 'right' });
+      pdf.setTextColor(100, 130, 165);
+      pdf.text(`Generated  ${generatedAt}`, M, 38);
 
-      y = 52;
+      // Risk level — top right of header
+      const riskText = (result.query_risk_level || 'Unknown').toUpperCase();
+      const riskColor =
+        riskText === 'CRITICAL' ? RED :
+        riskText === 'HIGH'     ? ORANGE :
+        riskText === 'MEDIUM'   ? [161, 120, 0] :
+                                  GREEN;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(...riskColor);
+      pdf.text(riskText, W - M, 22, { align: 'right' });
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 130, 165);
+      pdf.text('RISK LEVEL', W - M, 29, { align: 'right' });
 
-      // ─── KPI ROW ───────────────────────────────────────────────
+      // Explanation level — below risk
+      const lvlText = (result.explanation_level || explanationLevel || 'intermediate').toUpperCase();
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 130, 165);
+      pdf.text('EXPLANATION', W - M, 36, { align: 'right' });
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(...LTBLUE);
+      pdf.text(lvlText, W - M, 41, { align: 'right' });
+
+      y = 56;
+
+      // ── KPI ROW ────────────────────────────────────────────────────
       const kpis = [
-        { label: 'Complexity Score', value: `${result.complexity_score || 0} / 100` },
-        { label: 'Performance Gain', value: result.performance_gain || '—' },
-        { label: 'Exec. Time Before', value: result.estimated_execution_time_before || '—' },
-        { label: 'Exec. Time After',  value: result.estimated_execution_time_after  || '—' },
+        { label: 'COMPLEXITY SCORE',   value: `${result.complexity_score || 0}/100` },
+        { label: 'PERFORMANCE GAIN',   value: result.performance_gain || '—' },
+        { label: 'EXEC. TIME BEFORE',  value: result.estimated_execution_time_before || '—' },
+        { label: 'EXEC. TIME AFTER',   value: result.estimated_execution_time_after  || '—' },
       ];
-      const cw = (CW - 6) / 4;
+      const cw4 = (CW - 6) / 4;
       kpis.forEach((k, i) => {
-        const cx = MARGIN + i * (cw + 2);
-        pdf.setFillColor(248, 250, 252);
+        const cx = M + i * (cw4 + 2);
+        pdf.setFillColor(...CARDBG);
         pdf.setDrawColor(...RULE);
         pdf.setLineWidth(0.3);
-        pdf.roundedRect(cx, y, cw, 18, 1.5, 1.5, 'FD');
+        pdf.roundedRect(cx, y, cw4, 20, 1.5, 1.5, 'FD');
+        // Blue top accent bar
+        pdf.setFillColor(...BLUE);
+        pdf.rect(cx, y, cw4, 1.5, 'F');
 
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(11);
-        pdf.setTextColor(...DARK);
-        pdf.text(k.value, cx + cw / 2, y + 9, { align: 'center' });
+        pdf.setFontSize(11.5);
+        pdf.setTextColor(...NAVY);
+        pdf.text(k.value, cx + cw4 / 2, y + 11, { align: 'center' });
 
         pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(7);
-        pdf.setTextColor(...LIGHT);
-        pdf.text(k.label, cx + cw / 2, y + 15, { align: 'center' });
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(...LTGRAY);
+        pdf.text(k.label, cx + cw4 / 2, y + 17, { align: 'center' });
       });
-      y += 25;
+      y += 28;
 
-      // ─── AI EXPLANATION ────────────────────────────────────────
-      sectionTitle('AI Strategy & Explanation');
-      paragraph(result.explanation || 'No explanation provided.', 0, [30, 41, 59]);
-      y += 2;
+      // ── AI EXPLANATION ─────────────────────────────────────────────
+      sectionHeader('AI Strategy & Explanation');
+      bodyText(result.explanation || 'No explanation provided.', 0, DKGRAY, 9.5);
+      y += 3;
 
-      // ─── ORIGINAL QUERY ────────────────────────────────────────
+      // ── ORIGINAL QUERY ─────────────────────────────────────────────
       if (originalQuery) {
-        sectionTitle('Original Query');
-        codeBlock(originalQuery);
+        sectionHeader('Original Query');
+        codeBlock(originalQuery, null);
       }
 
-      // ─── OPTIMIZED QUERY ───────────────────────────────────────
+      // ── OPTIMIZED QUERY ────────────────────────────────────────────
       if (result.optimized_query) {
-        sectionTitle('Optimized Query');
-        const optLines = pdf.splitTextToSize(result.optimized_query, CW - 8);
-        const blockH = optLines.length * 4.8 + 7;
-        checkPage(blockH + 4);
-        pdf.setFillColor(248, 250, 252);
-        pdf.setDrawColor(...RULE);
-        pdf.setLineWidth(0.3);
-        pdf.roundedRect(MARGIN, y, CW, blockH, 1.5, 1.5, 'FD');
-        // Green left accent
-        pdf.setFillColor(...GREEN);
-        pdf.rect(MARGIN, y, 1.5, blockH, 'F');
-        pdf.setFont('courier', 'normal');
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(30, 41, 59);
-        pdf.text(optLines, MARGIN + 5, y + 5.5);
-        y += blockH + 5;
+        sectionHeader('Optimized Query');
+        codeBlock(result.optimized_query, BLUE);
       }
 
-      // ─── DETECTED BOTTLENECKS ──────────────────────────────────
+      // ── DETECTED BOTTLENECKS ───────────────────────────────────────
       if (result.issues_found?.length > 0) {
-        sectionTitle('Detected Bottlenecks');
-        result.issues_found.forEach((item) => bulletRow(item, ORANGE));
-        y += 2;
+        sectionHeader('Detected Bottlenecks');
+        result.issues_found.forEach((item) => accentRow(item, ORANGE));
+        y += 4;
       }
 
-      // ─── SECURITY RISKS ────────────────────────────────────────
+      // ── SECURITY & LOGIC RISKS ─────────────────────────────────────
       if (result.detected_risks?.length > 0) {
-        sectionTitle('Security & Logic Risks');
-        result.detected_risks.forEach((item) => bulletRow(item, RED));
-        y += 2;
+        sectionHeader('Security & Logic Risks');
+        result.detected_risks.forEach((item) => accentRow(item, RED));
+        y += 4;
       }
 
-      // ─── RECOMMENDED INDEXES ───────────────────────────────────
+      // ── RECOMMENDED INDEXES ────────────────────────────────────────
       if (result.index_sql?.length > 0) {
-        sectionTitle('Recommended Indexes');
+        sectionHeader('Recommended Indexes');
         result.index_sql.forEach((sql, i) => {
-          checkPage(12);
+          checkPage(14);
           pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(8);
-          pdf.setTextColor(...MID);
-          pdf.text(`Index ${i + 1}`, MARGIN, y);
+          pdf.setFontSize(7.5);
+          pdf.setTextColor(...MIDGRAY);
+          pdf.text(`INDEX ${i + 1}`, M, y);
           y += 5;
-          codeBlock(sql);
+          codeBlock(sql, PURPLE);
         });
       }
 
-      // ─── INDEX STRATEGY NOTES ──────────────────────────────────
+      // ── INDEX STRATEGY NOTES ───────────────────────────────────────
       if (result.index_suggestions?.length > 0) {
-        sectionTitle('Index Strategy Notes');
-        result.index_suggestions.forEach((note) => bulletRow(note, BLUE));
+        sectionHeader('Index Strategy Notes');
+        result.index_suggestions.forEach((note) => accentRow(note, BLUE));
         y += 2;
       }
 
-      // ─── FOOTER ON ALL PAGES ───────────────────────────────────
+      // ── FOOTER ON ALL PAGES ────────────────────────────────────────
       const total = pdf.internal.getNumberOfPages();
       for (let p = 1; p <= total; p++) {
         pdf.setPage(p);
         drawFooter();
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(7.5);
-        pdf.setTextColor(...LIGHT);
-        pdf.text(`${p} of ${total}`, W - MARGIN, 289, { align: 'right' });
+        pdf.setTextColor(...LTGRAY);
+        pdf.text(`${p} of ${total}`, W - M, 289.5, { align: 'right' });
       }
 
       const slug = new Date().toISOString().slice(0, 10);
@@ -291,6 +329,8 @@ export default function ResultPanel({ result, originalQuery }) {
     }
   };
 
+  const levelMeta = getLevelMeta(result.explanation_level || explanationLevel);
+
   const tabs = [
     { id: 'diff', icon: Code2, label: 'Code Comparison' },
     { id: 'analysis', icon: FileText, label: 'AI Analysis' },
@@ -307,6 +347,9 @@ export default function ResultPanel({ result, originalQuery }) {
             <Zap className="w-3.5 h-3.5 text-yellow-400" />
           </div>
           Optimization Report
+          <span className={`ml-1 px-2 py-0.5 rounded text-[10px] font-bold border ${levelMeta.color}`}>
+            {levelMeta.label}
+          </span>
         </h3>
         <button onClick={handleExportPDF} className="text-xs font-semibold flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-all bg-blue-500/10 hover:bg-blue-500/15 px-3 py-1.5 rounded-lg border border-blue-500/20">
           <Download className="w-3.5 h-3.5" /> Export PDF
@@ -429,6 +472,9 @@ export default function ResultPanel({ result, originalQuery }) {
                     <Info className="w-3 h-3 text-blue-400" />
                   </div>
                   AI Strategy & Explanation
+                  <span className={`ml-auto px-2 py-0.5 rounded text-[10px] font-bold border ${levelMeta.color}`}>
+                    {levelMeta.label}
+                  </span>
                 </h4>
                 <div className="bg-blue-500/5 p-5 rounded-xl border border-blue-500/15">
                   <p className="text-sm text-slate-300 leading-relaxed">{result.explanation}</p>

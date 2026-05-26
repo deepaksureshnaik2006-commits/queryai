@@ -371,11 +371,11 @@ export default function Landing() {
               Query<span className="text-blue-500">AI</span>
             </span>
           </div>
-          <p className="text-xs text-slate-600">© 2024 QueryAI · Built for developers who care about performance.</p>
-          <div className="flex items-center gap-5 text-xs text-slate-600">
-            <span className="hover:text-slate-400 cursor-pointer transition-colors">Privacy</span>
-            <span className="hover:text-slate-400 cursor-pointer transition-colors">Terms</span>
-            <span className="hover:text-slate-400 cursor-pointer transition-colors">Docs</span>
+          <p className="text-xs text-slate-600">© 2026 QueryAI · Built for developers who care about performance.</p>
+          <div className="flex items-center gap-5 text-xs text-slate-500">
+            <Link to="/privacy" className="hover:text-slate-300 transition-colors">Privacy</Link>
+            <Link to="/terms" className="hover:text-slate-300 transition-colors">Terms</Link>
+            <Link to="/docs" className="hover:text-slate-300 transition-colors">Docs</Link>
           </div>
         </div>
       </footer>
