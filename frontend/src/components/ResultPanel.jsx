@@ -206,10 +206,12 @@ export default function ResultPanel({ result, originalQuery, explanationLevel, d
       const bodyText = (text) => {
         pdf.setFont('times', 'normal');
         pdf.setFontSize(10.5);
-        pdf.setTextColor(30, 30, 30);
         const lines = pdf.splitTextToSize(text || '', CW);
         lines.forEach(line => {
           checkPage(7);
+          pdf.setFont('times', 'normal');
+          pdf.setFontSize(10.5);
+          pdf.setTextColor(30, 30, 30);
           pdf.text(line, M, y);
           y += 5.5;
         });
