@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Calendar, Trash2, ChevronDown, ChevronUp, Database, Star, Share2, Link as LinkIcon, Check } from 'lucide-react';
 import { toggleFavorite, togglePublic } from '../lib/api';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'sql-formatter';
 const safeFormatSQL = (sql, dbType = 'postgresql') => {
   if (!sql) return '';
@@ -45,6 +46,7 @@ const cleanPerformanceGain = (gain) => {
 };
 
 export default function HistoryCard({ item, onDelete }) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [isFavorite, setIsFavorite] = useState(item.is_favorite || false);
   const [isPublic, setIsPublic] = useState(item.is_public || false);
@@ -146,7 +148,7 @@ export default function HistoryCard({ item, onDelete }) {
           <div className="flex items-center justify-between pt-4 border-t border-white/5">
             <div className="flex items-center gap-2">
               <button
-                onClick={(e) => { e.stopPropagation(); window.open(`/share/${item.id}`, '_blank'); }}
+                onClick={(e) => { e.stopPropagation(); navigate(`/share/${item.id}`); }}
                 className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 px-3 py-2 rounded-lg transition-all border border-white/8 hover:border-white/15"
               >
                 <Database className="w-3.5 h-3.5" /> View Report
