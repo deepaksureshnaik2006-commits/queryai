@@ -60,6 +60,10 @@ export default function History() {
     setDeleteTarget(null);
   };
 
+  const handleUpdate = (updatedItem) => {
+    setHistory(prev => prev.map(item => item.id === updatedItem.id ? { ...item, ...updatedItem } : item));
+  };
+
   const filtered = useMemo(() => {
     let result = history;
     if (filter === 'favorites') result = result.filter(h => h.is_favorite);
@@ -245,6 +249,7 @@ export default function History() {
                 key={item.id}
                 item={item}
                 onDelete={handleDelete}
+                onUpdate={handleUpdate}
               />
             ))}
           </div>

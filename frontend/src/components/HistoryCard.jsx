@@ -45,7 +45,7 @@ const cleanPerformanceGain = (gain) => {
   return str.substring(0, 15) + '...';
 };
 
-export default function HistoryCard({ item, onDelete }) {
+export default function HistoryCard({ item, onDelete, onUpdate }) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [isFavorite, setIsFavorite] = useState(item.is_favorite || false);
@@ -61,6 +61,7 @@ export default function HistoryCard({ item, onDelete }) {
     try {
       await toggleFavorite(item.id, !isFavorite);
       setIsFavorite(!isFavorite);
+      if (onUpdate) onUpdate({ id: item.id, is_favorite: !isFavorite });
       toast.success(isFavorite ? 'Removed from favorites' : 'Added to favorites');
     } catch {
       toast.error('Failed to update favorite status');
@@ -73,6 +74,7 @@ export default function HistoryCard({ item, onDelete }) {
       if (!isPublic) {
         await togglePublic(item.id, true);
         setIsPublic(true);
+        if (onUpdate) onUpdate({ id: item.id, is_public: true });
       }
       const shareUrl = `${window.location.origin}/share/${item.id}`;
       navigator.clipboard.writeText(shareUrl);
