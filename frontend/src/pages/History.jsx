@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { getHistory, deleteHistory } from '../lib/api';
 import HistoryCard from '../components/HistoryCard';
-import { Loader2, BookOpen, Star, LayoutList, Search, Filter, X } from 'lucide-react';
+import { Loader2, BookOpen, Star, LayoutList, Search, Filter, X, Trash2, ArrowRight } from 'lucide-react';
 
 const DB_TYPES = ['All', 'PostgreSQL', 'MySQL', 'SQLite', 'SQL Server'];
 
@@ -12,6 +14,8 @@ export default function History() {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [dbFilter, setDbFilter] = useState('All');
+  const [deleteTarget, setDeleteTarget] = useState(null); // 'all' or id
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchHistory();
@@ -29,14 +33,31 @@ export default function History() {
     }
   };
 
-  const handleDelete = async (id) => {
-    try {
-      await deleteHistory(id);
-      setHistory(prev => prev.filter(item => item.id !== id));
-      toast.success('Record deleted');
-    } catch {
-      toast.error('Failed to delete record');
+  const handleDelete = (id) => setDeleteTarget(id);
+  const handleDeleteAll = () => setDeleteTarget('all');
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    if (deleteTarget === 'all') {
+      try {
+        const { deleteAllHistory } = await import('../lib/api');
+        await deleteAllHistory();
+        setHistory([]);
+        toast.success('All history deleted');
+      } catch {
+        toast.error('Failed to delete history');
+      }
+    } else {
+      try {
+        await deleteHistory(deleteTarget);
+        setHistory(prev => prev.filter(item => item.id !== deleteTarget));
+        toast.success('Record deleted');
+      } catch {
+        toast.error('Failed to delete record');
+      }
     }
+    setIsDeleting(false);
+    setDeleteTarget(null);
   };
 
   const filtered = useMemo(() => {
@@ -87,20 +108,33 @@ export default function History() {
             </div>
           </div>
 
-          {/* Favorite / All toggle */}
-          <div className="flex items-center bg-white/4 rounded-xl p-1 border border-white/6 gap-0.5 shrink-0">
-            <button
-              onClick={() => setFilter('all')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${filter === 'all' ? 'bg-blue-600 text-white shadow-[0_0_10px_-3px_rgba(37,99,235,0.6)]' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <LayoutList className="w-3.5 h-3.5" /> All
-            </button>
-            <button
-              onClick={() => setFilter('favorites')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${filter === 'favorites' ? 'bg-blue-600 text-white shadow-[0_0_10px_-3px_rgba(37,99,235,0.6)]' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <Star className="w-3.5 h-3.5" /> Favorites
-            </button>
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Delete All Button */}
+            {history.length > 0 && (
+              <button
+                onClick={handleDeleteAll}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-200"
+              >
+                <Trash2 className="w-4 h-4" /> Delete All
+              </button>
+            )}
+
+            {/* Favorite / All toggle */}
+            <div className="flex items-center bg-white/4 rounded-xl p-1 border border-white/6 gap-0.5 shrink-0">
+              <button
+                onClick={() => setFilter('all')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${filter === 'all' ? 'bg-blue-600 text-white shadow-[0_0_10px_-3px_rgba(37,99,235,0.6)]' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <LayoutList className="w-3.5 h-3.5" /> All
+              </button>
+              <button
+                onClick={() => setFilter('favorites')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${filter === 'favorites' ? 'bg-blue-600 text-white shadow-[0_0_10px_-3px_rgba(37,99,235,0.6)]' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <Star className="w-3.5 h-3.5" /> Favorites
+              </button>
+            </div>
           </div>
         </div>
 
@@ -185,6 +219,16 @@ export default function History() {
                 : 'Your optimized queries will be saved here automatically after each run.'
               }
             </p>
+            {!hasActiveFilters && filter === 'all' && (
+              <div className="mt-6">
+                <Link
+                  to="/dashboard"
+                  className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/8 border border-white/10 text-slate-300 hover:text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all duration-200"
+                >
+                  Try QueryAI <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            )}
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
@@ -206,6 +250,78 @@ export default function History() {
           </div>
         )}
       </div>
+
+      {/* Premium Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop with Blur */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isDeleting && setDeleteTarget(null)}
+              className="absolute inset-0 bg-black/75 backdrop-blur-md"
+            />
+
+            {/* Modal Body */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-md bg-[#0a0d14]/90 border border-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-2xl overflow-hidden z-10"
+            >
+              {/* Top Accent Gradient Border */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-red-500/0 via-red-500/50 to-red-500/0" />
+
+              <div className="flex flex-col items-center text-center">
+                {/* Warning Icon Container */}
+                <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-4 animate-pulse">
+                  <Trash2 className="w-5.5 h-5.5" />
+                </div>
+
+                {/* Heading */}
+                <h3 className="text-lg font-bold text-white mb-2">
+                  {deleteTarget === 'all' ? 'Clear All History' : 'Delete Record'}
+                </h3>
+
+                {/* Subtext */}
+                <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                  {deleteTarget === 'all'
+                    ? 'Are you sure you want to delete all history? This action cannot be undone and will permanently remove all your optimization records.'
+                    : 'Are you sure you want to delete this record? This action cannot be undone and will permanently remove this optimized query.'}
+                </p>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 w-full">
+                  <button
+                    disabled={isDeleting}
+                    onClick={() => setDeleteTarget(null)}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-400 hover:text-slate-200 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={isDeleting}
+                    onClick={confirmDelete}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 active:bg-red-700 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.3)] hover:shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      'Delete'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

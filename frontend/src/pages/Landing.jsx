@@ -92,8 +92,8 @@ const FEATURES = [
     icon: Globe,
     color: 'teal',
     title: 'Shareable Reports',
-    desc: 'Export full PDF reports or share optimization results via a public link. Perfect for code reviews, team collaboration, and documentation.',
-    tags: ['PDF export', 'JSON export', 'Public sharing'],
+    desc: 'Export full PDF reports. Perfect for code reviews, team collaboration, and documentation.',
+    tags: ['PDF export', 'JSON export'],
   },
 ];
 

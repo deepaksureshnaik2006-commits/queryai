@@ -16,9 +16,9 @@ const getHeaders = async () => {
   };
 };
 
-export const optimizeQuery = async (query, db_type, explanation_level = 'Intermediate') => {
+export const optimizeQuery = async (query, db_type, explanation_level = 'Intermediate', signal) => {
   const headers = await getHeaders();
-  const response = await axios.post(`${API_URL}/optimize`, { query, db_type, explanation_level }, { headers });
+  const response = await axios.post(`${API_URL}/optimize`, { query, db_type, explanation_level }, { headers, signal });
   return response.data;
 };
 
@@ -54,6 +54,12 @@ export const deleteHistory = async (id) => {
   return response.data;
 };
 
+export const deleteAllHistory = async () => {
+  const headers = await getHeaders();
+  const response = await axios.delete(`${API_URL}/history/all`, { headers });
+  return response.data;
+};
+
 export const toggleFavorite = async (id, is_favorite) => {
   const headers = await getHeaders();
   const response = await axios.patch(`${API_URL}/history/${id}/favorite`, { is_favorite }, { headers });
@@ -68,5 +74,11 @@ export const togglePublic = async (id, is_public) => {
 
 export const getSharedQuery = async (id) => {
   const response = await axios.get(`${API_URL}/history/public/${id}`);
+  return response.data;
+};
+
+export const getPrivateQuery = async (id) => {
+  const headers = await getHeaders();
+  const response = await axios.get(`${API_URL}/history/${id}`, { headers });
   return response.data;
 };

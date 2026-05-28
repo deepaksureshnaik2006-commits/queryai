@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getSharedQuery } from '../lib/api';
+import { getSharedQuery, getPrivateQuery } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import ResultPanel from '../components/ResultPanel';
 import { Loader2, Database, AlertCircle, ArrowRight } from 'lucide-react';
 
 export default function SharedQuery() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -13,8 +15,17 @@ export default function SharedQuery() {
   useEffect(() => {
     getSharedQuery(id)
       .then(res => { setData(res); setLoading(false); })
-      .catch(() => { setError('Query not found or is no longer public.'); setLoading(false); });
-  }, [id]);
+      .catch(() => {
+        if (user) {
+          getPrivateQuery(id)
+            .then(res => { setData(res); setLoading(false); })
+            .catch(() => { setError('Query not found.'); setLoading(false); });
+        } else {
+          setError('Query not found or is no longer public.'); 
+          setLoading(false);
+        }
+      });
+  }, [id, user]);
 
   if (loading) {
     return (
@@ -59,7 +70,7 @@ export default function SharedQuery() {
             <h1 className="text-2xl font-black text-white tracking-tight">Query Analysis Report</h1>
           </div>
           <Link
-            to="/"
+            to={user ? "/dashboard" : "/signup"}
             className="flex items-center gap-2 bg-white/5 hover:bg-white/8 border border-white/10 text-slate-300 hover:text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all duration-200"
           >
             Try QueryAI <ArrowRight className="w-4 h-4" />
@@ -67,7 +78,7 @@ export default function SharedQuery() {
         </div>
 
         <div className="min-h-[700px]">
-          <ResultPanel result={data} originalQuery={data.original_query} />
+          <ResultPanel result={data} originalQuery={data.original_query} dbType={data.db_type} />
         </div>
       </div>
     </div>

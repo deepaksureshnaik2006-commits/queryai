@@ -3,6 +3,46 @@ import { Calendar, Trash2, ChevronDown, ChevronUp, Database, Star, Share2, Link 
 import { toggleFavorite, togglePublic } from '../lib/api';
 import toast from 'react-hot-toast';
 import { format } from 'sql-formatter';
+const safeFormatSQL = (sql, dbType = 'postgresql') => {
+  if (!sql) return '';
+  try {
+    let lang = 'postgresql';
+    const type = (dbType || '').toLowerCase().trim();
+    if (type === 'mysql') lang = 'mysql';
+    else if (type === 'sqlite') lang = 'sqlite';
+    else if (type === 'sql server' || type === 'tsql') lang = 'tsql';
+    
+    return format(sql, { 
+      language: lang,
+      tabWidth: 2,
+      keywordCase: 'upper'
+    });
+  } catch (err) {
+    console.warn('SQL formatting failed, using raw query:', err);
+    return sql;
+  }
+};
+
+const cleanPerformanceGain = (gain) => {
+  if (!gain) return '—';
+  const str = String(gain).trim();
+  if (str.length <= 15) return str;
+
+  // Try to find a multiplier pattern like "10x faster" or "10x"
+  const multiplierMatch = str.match(/(\d+(?:\.\d+)?x(?:\s+faster)?)/i);
+  if (multiplierMatch && multiplierMatch[1]) {
+    return multiplierMatch[1].toLowerCase();
+  }
+
+  // Try to find a percentage pattern like "95% faster"
+  const percentMatch = str.match(/(\d+%\s*(?:faster|improvement|reduction)?)/i);
+  if (percentMatch && percentMatch[1]) {
+    return percentMatch[1];
+  }
+
+  // Otherwise, just truncate it gracefully
+  return str.substring(0, 15) + '...';
+};
 
 export default function HistoryCard({ item, onDelete }) {
   const [expanded, setExpanded] = useState(false);
@@ -76,8 +116,8 @@ export default function HistoryCard({ item, onDelete }) {
 
         {/* Gain badge + toggle */}
         <div className="flex items-center gap-2 shrink-0">
-          <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-2.5 py-1 rounded-lg border border-emerald-500/20 whitespace-nowrap">
-            {item.performance_gain}
+          <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-2.5 py-1 rounded-lg border border-emerald-500/20 whitespace-nowrap" title={item.performance_gain}>
+            {cleanPerformanceGain(item.performance_gain)}
           </span>
           <div className="text-slate-600">
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -92,13 +132,13 @@ export default function HistoryCard({ item, onDelete }) {
             <div>
               <h4 className="text-[10px] font-bold text-slate-600 mb-2 uppercase tracking-widest">Original Query</h4>
               <pre className="text-xs font-mono bg-white/3 p-4 rounded-xl border border-white/6 overflow-x-auto text-slate-400 max-h-64 leading-relaxed">
-                {format(item.original_query || '', { language: 'postgresql' })}
+                {safeFormatSQL(item.original_query || '', item.db_type)}
               </pre>
             </div>
             <div>
               <h4 className="text-[10px] font-bold text-slate-600 mb-2 uppercase tracking-widest">Optimized Query</h4>
               <pre className="text-xs font-mono bg-blue-500/5 p-4 rounded-xl border border-blue-500/15 overflow-x-auto text-blue-300 max-h-64 leading-relaxed">
-                {format(item.optimized_query || '', { language: 'postgresql' })}
+                {safeFormatSQL(item.optimized_query || '', item.db_type)}
               </pre>
             </div>
           </div>
@@ -111,20 +151,6 @@ export default function HistoryCard({ item, onDelete }) {
               >
                 <Database className="w-3.5 h-3.5" /> View Report
               </button>
-
-              <button
-                onClick={handleShare}
-                className="flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-3 py-2 rounded-lg transition-all border border-transparent hover:border-blue-500/20"
-              >
-                {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
-                {copiedLink ? 'Copied!' : isPublic ? 'Copy Link' : 'Share'}
-              </button>
-
-              {isPublic && (
-                <span className="text-[10px] text-slate-600 flex items-center gap-1 bg-white/4 px-2 py-1 rounded-md border border-white/8 font-medium">
-                  <LinkIcon className="w-3 h-3" /> Public
-                </span>
-              )}
             </div>
 
             <button

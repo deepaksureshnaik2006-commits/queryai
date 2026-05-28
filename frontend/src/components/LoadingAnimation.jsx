@@ -52,15 +52,15 @@ export default function LoadingAnimation() {
             <motion.div
               key={index}
               animate={{
-                opacity: isFuture ? 0.35 : 1,
+                opacity: 1,
               }}
               transition={{ duration: 0.45, ease: 'easeOut' }}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors duration-300 ${
                 isActive
-                  ? 'bg-blue-500/8 border-blue-500/25'
+                  ? 'bg-blue-500/10 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
                   : isPast
-                  ? 'bg-emerald-500/5 border-emerald-500/15'
-                  : 'bg-transparent border-white/6'
+                  ? 'bg-emerald-500/5 border-emerald-500/20'
+                  : 'bg-white/5 border-white/10'
               }`}
             >
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-300 ${

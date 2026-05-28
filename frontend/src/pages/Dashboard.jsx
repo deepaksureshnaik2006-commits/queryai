@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import QueryEditor from '../components/QueryEditor';
 import ResultPanel from '../components/ResultPanel';
 import LoadingAnimation from '../components/LoadingAnimation';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { optimizeQuery, saveHistory } from '../lib/api';
 import toast from 'react-hot-toast';
 import { Activity, Zap } from 'lucide-react';
+import axios from 'axios';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -15,13 +16,27 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [explanationLevel, setExplanationLevel] = useState('Intermediate');
   const [activeTab, setActiveTab] = useState('optimizer');
+  const [usedDbType, setUsedDbType] = useState('PostgreSQL');
+  const abortControllerRef = useRef(null);
 
   const handleOptimize = async (query, dbType) => {
     setIsLoading(true);
     setResult(null);
     setOriginalQuery(query);
+    setUsedDbType(dbType);
+    
+    abortControllerRef.current = new AbortController();
+
     try {
-      const optimizedData = await optimizeQuery(query, dbType, explanationLevel);
+      // Force minimum delay of 5.6s so all 4 animation steps (1400ms each) 
+      // have time to fully light up before displaying the result.
+      const minDelay = new Promise(resolve => setTimeout(resolve, 5600));
+      const apiCall = optimizeQuery(query, dbType, explanationLevel, abortControllerRef.current.signal);
+      
+      const [optimizedData] = await Promise.all([apiCall, minDelay]);
+      
+      if (abortControllerRef.current.signal.aborted) return;
+
       setResult(optimizedData);
       if (user) {
         saveHistory(query, optimizedData, dbType).catch(err => {
@@ -29,9 +44,21 @@ export default function Dashboard() {
         });
       }
     } catch (error) {
-      toast.error(error.message || 'Optimization failed');
+      if (axios.isCancel(error) || error.name === 'CanceledError' || abortControllerRef.current?.signal.aborted) {
+        toast.error('Optimization canceled');
+      } else {
+        const errorMsg = error.response?.data?.error || error.message || 'Optimization failed';
+        toast.error(errorMsg);
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
   };
 
@@ -70,6 +97,7 @@ export default function Dashboard() {
               <div className="w-full xl:w-1/2 flex flex-col min-h-[620px] z-10">
                 <QueryEditor
                   onOptimize={handleOptimize}
+                  onCancel={handleCancel}
                   isLoading={isLoading}
                   explanationLevel={explanationLevel}
                   setExplanationLevel={setExplanationLevel}
@@ -79,7 +107,7 @@ export default function Dashboard() {
                 {isLoading ? (
                   <LoadingAnimation />
                 ) : (
-                  <ResultPanel result={result} originalQuery={originalQuery} explanationLevel={explanationLevel} />
+                  <ResultPanel result={result} originalQuery={originalQuery} explanationLevel={explanationLevel} dbType={usedDbType} />
                 )}
               </div>
             </div>

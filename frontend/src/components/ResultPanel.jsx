@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy, AlertTriangle, Zap, Info, Download, Gauge, Activity, ShieldAlert, Code2, Columns, Database, FileText } from 'lucide-react';
-import { DiffEditor } from '@monaco-editor/react';
+import { DiffEditor, Editor } from '@monaco-editor/react';
 import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 import { format } from 'sql-formatter';
@@ -12,9 +12,59 @@ const LEVEL_META = {
   'dba expert':  { label: 'DBA Expert',   color: 'text-red-400 bg-red-500/10 border-red-500/25' },
 };
 
+const safeFormatSQL = (sql, dbType = 'postgresql') => {
+  if (!sql) return '';
+  let lang = 'postgresql';
+  const type = (dbType || '').toLowerCase().trim();
+  if (type === 'mysql') lang = 'mysql';
+  else if (type === 'sqlite') lang = 'sqlite';
+  else if (type === 'sql server' || type === 'tsql') lang = 'tsql';
+  
+  try {
+    return format(sql, { 
+      language: lang,
+      tabWidth: 2,
+      keywordCase: 'upper'
+    });
+  } catch (err) {
+    try {
+      // Fallback to standard SQL formatting if dialect-specific fails
+      return format(sql, {
+        language: 'sql',
+        tabWidth: 2,
+        keywordCase: 'upper'
+      });
+    } catch (fallbackErr) {
+      console.warn('SQL formatting failed, using raw query:', fallbackErr);
+      return sql;
+    }
+  }
+};
+
 const getLevelMeta = (level) => LEVEL_META[(level || '').toLowerCase()] || LEVEL_META.intermediate;
 
-export default function ResultPanel({ result, originalQuery, explanationLevel }) {
+const cleanPerformanceGain = (gain) => {
+  if (!gain) return '—';
+  const str = String(gain).trim();
+  if (str.length <= 15) return str;
+
+  // Try to find a multiplier pattern like "10x faster" or "10x"
+  const multiplierMatch = str.match(/(\d+(?:\.\d+)?x(?:\s+faster)?)/i);
+  if (multiplierMatch && multiplierMatch[1]) {
+    return multiplierMatch[1].toLowerCase();
+  }
+
+  // Try to find a percentage pattern like "95% faster"
+  const percentMatch = str.match(/(\d+%\s*(?:faster|improvement|reduction)?)/i);
+  if (percentMatch && percentMatch[1]) {
+    return percentMatch[1];
+  }
+
+  // Otherwise, just truncate it gracefully
+  return str.substring(0, 15) + '...';
+};
+
+export default function ResultPanel({ result, originalQuery, explanationLevel, dbType = 'PostgreSQL' }) {
   const [copied, setCopied] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [activeTab, setActiveTab] = useState('diff');
@@ -49,277 +99,310 @@ export default function ResultPanel({ result, originalQuery, explanationLevel })
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const W = 210;
-      const M = 18;
+      const M = 15;
       const CW = W - M * 2;
-      const generatedAt = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
+      const generatedAt = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', ' ·');
       let y = 0;
 
-      // ── Palette (restrained — only used where truly needed) ─────────
-      const NAVY    = [10, 25, 55];
-      const DKTEXT  = [22, 35, 58];
-      const MIDTEXT = [75, 90, 115];
-      const LTTEXT  = [140, 155, 175];
-      const RULE    = [220, 226, 235];
-      const CARDBG  = [247, 249, 252];
-      const BLUE    = [37, 99, 235];
-      const GREEN   = [21, 128, 61];
-      const ORANGE  = [180, 75, 10];
-      const RED     = [185, 28, 28];
-
-      // ── drawFooter: rule + label only — NO page number here ─────────
-      const drawFooter = () => {
-        pdf.setDrawColor(...RULE);
-        pdf.setLineWidth(0.25);
-        pdf.line(M, 283, W - M, 283);
+      const drawHeader = () => {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text('QUERYAI', M, 12);
+        
         pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(...LTTEXT);
-        pdf.text('QueryAI  ·  SQL Optimization Report', M, 288.5);
+        pdf.setTextColor(100, 100, 100);
+        pdf.text('SQL Optimization Report', M + 18, 12);
+        
+        pdf.text('Generated ' + generatedAt, W - M, 12, { align: 'right' });
+        
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.3);
+        pdf.line(M, 14, W - M, 14);
       };
 
-      // ── checkPage: add new page, reset y, stamp footer placeholder ──
+      const drawFooter = (pageNo, total) => {
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setLineWidth(0.3);
+        pdf.line(M, 285, W - M, 285);
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(120, 120, 120);
+        pdf.text('QueryAI © 2026 — Confidential', M, 290);
+        pdf.text('Page ' + pageNo, W - M, 290, { align: 'right' });
+      };
+
       const checkPage = (need = 18) => {
-        if (y + need > 276) {
+        if (y + need > 278) {
           pdf.addPage();
-          pdf.setFillColor(255, 255, 255);
-          pdf.rect(0, 0, W, 297, 'F');
-          y = M + 2;
+          drawHeader();
+          y = 22;
         }
       };
 
-      const sectionHeader = (title) => {
-        checkPage(16);
-        y += 4;
+      const sectionHeader = (title, requiredSpace = 10) => {
+        checkPage(requiredSpace + 10);
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(...BLUE);
-        pdf.text(title.toUpperCase(), M, y);
-        y += 1.5;
-        pdf.setDrawColor(...RULE);
-        pdf.setLineWidth(0.3);
-        pdf.line(M, y + 1, W - M, y + 1);
-        y += 7;
-      };
-
-      const bodyText = (text, color = DKTEXT) => {
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9.5);
-        pdf.setTextColor(...color);
-        const lines = pdf.splitTextToSize(text, CW - 2);
-        checkPage(lines.length * 5.2 + 3);
-        pdf.text(lines, M, y);
-        y += lines.length * 5.2 + 2;
+        pdf.setFontSize(11);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text(title, M, y);
+        y += 6;
       };
 
       const tryFormatSQL = (sql) => {
-        try {
-          return format(sql || '', { language: 'postgresql', tabWidth: 2, keywordCase: 'upper' });
-        } catch { return sql || ''; }
+        return safeFormatSQL(sql, dbType);
       };
 
-      const codeBlock = (sql, leftAccent = null) => {
+      const codeBlock = (sql) => {
         const formatted = tryFormatSQL(sql);
-        const lines = pdf.splitTextToSize(formatted, CW - 12);
-        const bh = Math.max(lines.length * 4.8 + 9, 16);
-        checkPage(bh + 4);
-        // background
-        pdf.setFillColor(...CARDBG);
-        pdf.setDrawColor(...RULE);
-        pdf.setLineWidth(0.25);
-        pdf.roundedRect(M, y, CW, bh, 1.5, 1.5, 'FD');
-        // optional left accent
-        if (leftAccent) {
-          pdf.setFillColor(...leftAccent);
-          pdf.rect(M, y, 2, bh, 'F');
-        }
-        pdf.setFont('courier', 'normal');
-        pdf.setFontSize(8);
-        pdf.setTextColor(...DKTEXT);
-        pdf.text(lines, leftAccent ? M + 5 : M + 4, y + 6);
-        y += bh + 5;
-      };
-
-      const bulletRow = (text, prefix = '·', prefixColor = MIDTEXT) => {
-        const lines = pdf.splitTextToSize(text, CW - 8);
-        const rh = lines.length * 5.2 + 5;
-        checkPage(rh + 2);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(10);
-        pdf.setTextColor(...prefixColor);
-        pdf.text(prefix, M + 1, y + 4);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9.5);
-        pdf.setTextColor(...DKTEXT);
-        pdf.text(lines, M + 6, y + 4);
-        pdf.setDrawColor(...RULE);
-        pdf.setLineWidth(0.2);
-        pdf.line(M, y + rh, W - M, y + rh);
-        y += rh + 1;
-      };
-
-      // ════════════════════════════════════════════════════════════════
-      // PAGE 1 — white background
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, W, 297, 'F');
-
-      // ── HEADER BAND ─────────────────────────────────────────────────
-      pdf.setFillColor(...NAVY);
-      pdf.rect(0, 0, W, 46, 'F');
-      // thin blue accent line
-      pdf.setFillColor(...BLUE);
-      pdf.rect(0, 46, W, 1.2, 'F');
-
-      // Brand
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(22);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text('QueryAI', M, 19);
-
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(160, 185, 220);
-      pdf.text('SQL Optimization Report', M, 28);
-
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(100, 130, 165);
-      pdf.text(`Generated: ${generatedAt}`, M, 39);
-
-      // Risk badge — top right
-      const riskRaw = (result.query_risk_level || 'Unknown');
-      const riskUpper = riskRaw.toUpperCase();
-      const riskCol = riskUpper === 'CRITICAL' ? [239,68,68] : riskUpper === 'HIGH' ? [249,115,22] : riskUpper === 'MEDIUM' ? [234,179,8] : [34,197,94];
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9);
-      pdf.setTextColor(...riskCol);
-      pdf.text(riskRaw, W - M, 22, { align: 'right' });
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
-      pdf.setTextColor(100, 130, 165);
-      pdf.text('Risk Level', W - M, 30, { align: 'right' });
-
-      const lvl = (result.explanation_level || explanationLevel || 'intermediate');
-      const lvlLabel = lvl.charAt(0).toUpperCase() + lvl.slice(1);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
-      pdf.setTextColor(100, 130, 165);
-      pdf.text('Explanation', W - M, 39, { align: 'right' });
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8);
-      pdf.setTextColor(160, 185, 220);
-      pdf.text(lvlLabel, W - M, 44.5, { align: 'right' });
-
-      y = 58;
-
-      // ── KPI CARDS ────────────────────────────────────────────────────
-      const kpis = [
-        { label: 'Complexity',    value: `${result.complexity_score || 0}/100` },
-        { label: 'Performance',   value: result.performance_gain || '—' },
-        { label: 'Time Before',   value: result.estimated_execution_time_before || '—' },
-        { label: 'Time After',    value: result.estimated_execution_time_after  || '—' },
-      ];
-      const cw4 = (CW - 4.5) / 4;
-      kpis.forEach((k, i) => {
-        const cx = M + i * (cw4 + 1.5);
-        pdf.setFillColor(...CARDBG);
-        pdf.setDrawColor(...RULE);
-        pdf.setLineWidth(0.25);
-        pdf.roundedRect(cx, y, cw4, 22, 1.5, 1.5, 'FD');
-
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(12);
-        pdf.setTextColor(...NAVY);
-        pdf.text(k.value, cx + cw4 / 2, y + 11.5, { align: 'center' });
-
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(6.5);
-        pdf.setTextColor(...LTTEXT);
-        pdf.text(k.label.toUpperCase(), cx + cw4 / 2, y + 18, { align: 'center' });
-      });
-      y += 30;
-
-      // ── AI EXPLANATION ───────────────────────────────────────────────
-      sectionHeader('AI Explanation');
-      bodyText(result.explanation || 'No explanation provided.');
-      y += 4;
-
-      // ── ORIGINAL QUERY ───────────────────────────────────────────────
-      if (originalQuery) {
-        sectionHeader('Original Query');
-        codeBlock(originalQuery, null);
-      }
-
-      // ── OPTIMIZED QUERY ──────────────────────────────────────────────
-      if (result.optimized_query) {
-        sectionHeader('Optimized Query');
-        codeBlock(result.optimized_query, BLUE);
-      }
-
-      // ── BOTTLENECKS ──────────────────────────────────────────────────
-      if (result.issues_found?.length > 0) {
-        sectionHeader('Detected Bottlenecks');
-        result.issues_found.forEach((item) => bulletRow(item, '▸', ORANGE));
-        y += 3;
-      }
-
-      // ── SECURITY RISKS ───────────────────────────────────────────────
-      if (result.detected_risks?.length > 0) {
-        sectionHeader('Security & Logic Risks');
-        result.detected_risks.forEach((item) => bulletRow(item, '!', RED));
-        y += 3;
-      }
-
-      // ── RECOMMENDED INDEXES ──────────────────────────────────────────
-      if (result.index_sql?.length > 0) {
-        sectionHeader('Recommended Indexes');
-        result.index_sql.forEach((sql, i) => {
-          checkPage(20);
-          // Index label
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(7.5);
-          pdf.setTextColor(...MIDTEXT);
-          pdf.text(`INDEX ${i + 1}`, M, y);
-          y += 4;
-          // SQL block with green accent
-          codeBlock(sql, GREEN);
-          // Paired explanation (if available)
-          const note = result.index_suggestions?.[i];
-          if (note) {
-            const noteLines = pdf.splitTextToSize(`→  ${note}`, CW - 6);
-            const noteH = noteLines.length * 4.8 + 6;
-            checkPage(noteH + 2);
-            pdf.setFillColor(240, 247, 240);
-            pdf.setDrawColor(180, 210, 185);
-            pdf.setLineWidth(0.2);
-            pdf.roundedRect(M, y, CW, noteH, 1.5, 1.5, 'FD');
-            pdf.setFont('helvetica', 'normal');
-            pdf.setFontSize(8.5);
-            pdf.setTextColor(30, 90, 50);
-            pdf.text(noteLines, M + 4, y + 5);
-            y += noteH + 4;
-          }
-          y += 2;
+        const rawLines = formatted.split('\n');
+        let lines = [];
+        rawLines.forEach(line => {
+           if (line.length > 95) {
+             lines.push(line.substring(0, 95));
+             lines.push('  ' + line.substring(95));
+           } else {
+             lines.push(line);
+           }
         });
-        // Any extra notes beyond the SQL count
-        if (result.index_suggestions?.length > result.index_sql.length) {
-          y += 2;
-          sectionHeader('Additional Index Notes');
-          result.index_suggestions.slice(result.index_sql.length).forEach((note) => bulletRow(note, '→', BLUE));
-        }
-        y += 2;
+
+        const lh = 4.5;
+        const padding = 5;
+        const bh = Math.max(lines.length * lh + padding * 2, 16);
+        
+        pdf.setFillColor(248, 248, 248);
+        pdf.setDrawColor(220, 220, 220);
+        pdf.setLineWidth(0.2);
+        pdf.rect(M, y, CW, bh, 'FD');
+
+        pdf.setFont('courier', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(40, 40, 40);
+        
+        let textY = y + padding + 3;
+        lines.forEach(l => {
+          if (l.trim() !== '') {
+            pdf.text(l, M + padding, textY);
+          }
+          textY += lh;
+        });
+        
+        y += bh + 6;
+      };
+
+      const bulletRow = (text) => {
+        const lines = pdf.splitTextToSize('—  ' + text, CW - 4);
+        const rh = lines.length * 5.5 + 2;
+        checkPage(rh);
+        
+        pdf.setFont('times', 'normal');
+        pdf.setFontSize(10.5);
+        pdf.setTextColor(30, 30, 30);
+        pdf.text(lines, M + 4, y + 4);
+        y += rh;
+      };
+
+      const bodyText = (text) => {
+        pdf.setFont('times', 'normal');
+        pdf.setFontSize(10.5);
+        pdf.setTextColor(30, 30, 30);
+        const lines = pdf.splitTextToSize(text || '', CW);
+        lines.forEach(line => {
+          checkPage(7);
+          pdf.text(line, M, y);
+          y += 5.5;
+        });
+        y += 4;
+      };
+
+      // PAGE 1 Header
+      drawHeader();
+      y = 28;
+
+      pdf.setFont('times', 'bold');
+      pdf.setFontSize(22);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('SQL Optimization Report', M, y);
+      
+      y += 8;
+      pdf.setFont('times', 'italic');
+      pdf.setFontSize(11);
+      pdf.setTextColor(60, 60, 60);
+      pdf.text('Performance analysis, index recommendations, and risk assessment for the query.', M, y);
+      
+      y += 6;
+
+      // KPI Grid
+      pdf.setDrawColor(120, 120, 120);
+      pdf.setLineWidth(0.5);
+      pdf.line(M, y, W - M, y); // Top line
+      y += 6;
+
+      const colW = CW / 4;
+      
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text('Complexity', M, y);
+      pdf.text('Improvement', M + colW, y);
+      pdf.text('Risk Level', M + colW * 2, y);
+      pdf.text('Execution Time', M + colW * 3, y);
+      
+      y += 7;
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text((result.complexity_score || 0) + ' / 100', M, y);
+      pdf.text((cleanPerformanceGain(result.performance_gain) || '—'), M + colW, y);
+      pdf.text(result.query_risk_level || 'Unknown', M + colW * 2, y);
+      pdf.text((result.estimated_execution_time_before || '—') + ' -> ' + (result.estimated_execution_time_after || '—'), M + colW * 3, y);
+      
+      y += 5;
+      pdf.setDrawColor(220, 220, 220);
+      pdf.setLineWidth(0.3);
+      pdf.line(M, y, W - M, y); // Bottom line
+      y += 12;
+
+      // 1. Original Query
+      if (originalQuery) {
+        const formatted = tryFormatSQL(originalQuery);
+        const linesCount = formatted.split('\n').length;
+        const requiredSpace = Math.max(linesCount * 4.5 + 10, 16) + 12;
+        sectionHeader('1. Original Query', requiredSpace);
+        codeBlock(originalQuery);
       }
 
-      // ── STAMP FOOTER + PAGE NUMBERS ON ALL PAGES ─────────────────────
-      // Must be done AFTER all content so we know the total page count.
+      // 2. Optimized Query
+      if (result.optimized_query) {
+        const formatted = tryFormatSQL(result.optimized_query);
+        const linesCount = formatted.split('\n').length;
+        const requiredSpace = Math.max(linesCount * 4.5 + 10, 16) + 12;
+        sectionHeader('2. Optimized Query', requiredSpace);
+        codeBlock(result.optimized_query);
+        
+        const isUnchanged = tryFormatSQL(originalQuery || '') === formatted;
+        if (isUnchanged) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(9);
+          pdf.setTextColor(100, 100, 100);
+          pdf.text('Query text is unchanged; performance gains derive entirely from the recommended indexes.', M, y - 2);
+          y += 6;
+        }
+      }
+
+      // 3. Bottlenecks
+      if (result.issues_found?.length > 0) {
+        sectionHeader('3. Bottlenecks & Issues', 20);
+        result.issues_found.forEach(item => bulletRow(item));
+        y += 6;
+      }
+
+      // 4. Detected Risks
+      if (result.detected_risks?.length > 0) {
+        sectionHeader('4. Detected Risks', 20);
+        result.detected_risks.forEach(item => bulletRow(item));
+        y += 6;
+      }
+
+      // 5. Recommended Indexes
+      if (result.index_sql?.length > 0) {
+        let firstBoxH = 30;
+        if (result.index_sql[0]) {
+          const formattedIdx = tryFormatSQL(result.index_sql[0]);
+          let linesIdx = [];
+          formattedIdx.split('\n').forEach(line => {
+            if (line.length > 95) {
+              linesIdx.push(line.substring(0, 95));
+              linesIdx.push('  ' + line.substring(95));
+            } else {
+              linesIdx.push(line);
+            }
+          });
+          const codeBlockH = Math.max(linesIdx.length * 4.5 + 10, 16) + 4;
+          const explanation = result.index_suggestions?.[0];
+          const explanationH = explanation ? (pdf.splitTextToSize(explanation, CW - 4).length * 5 + 6) : 0;
+          firstBoxH = codeBlockH + explanationH + 16;
+        }
+        sectionHeader('5. Recommended Indexes', firstBoxH + 10);
+        
+        result.index_sql.forEach((sql, i) => {
+          const formattedIdx = tryFormatSQL(sql);
+          const rawLinesIdx = formattedIdx.split('\n');
+          let linesIdx = [];
+          rawLinesIdx.forEach(line => {
+            if (line.length > 95) {
+              linesIdx.push(line.substring(0, 95));
+              linesIdx.push('  ' + line.substring(95));
+            } else {
+              linesIdx.push(line);
+            }
+          });
+          const codeBlockH = Math.max(linesIdx.length * 4.5 + 10, 16) + 4;
+          const explanation = result.index_suggestions?.[i];
+          const explanationH = explanation ? (pdf.splitTextToSize(explanation, CW - 4).length * 5 + 6) : 0;
+          
+          const boxH = codeBlockH + explanationH + 16;
+          
+          checkPage(boxH);
+          
+          pdf.setFillColor(255, 255, 255);
+          pdf.setDrawColor(220, 220, 220);
+          pdf.rect(M, y, CW, boxH - 4, 'FD');
+          
+          let curY = y + 7;
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(9);
+          pdf.setTextColor(20, 20, 20);
+          pdf.text('INDEX ' + (i + 1), M + 4, curY);
+          
+          curY += 6;
+          
+          pdf.setFillColor(248, 248, 248);
+          pdf.setDrawColor(220, 220, 220);
+          pdf.rect(M + 4, curY, CW - 8, codeBlockH - 4, 'FD');
+          
+          pdf.setFont('courier', 'normal');
+          pdf.setFontSize(8.5);
+          pdf.setTextColor(40, 40, 40);
+          
+          let textY = curY + 6;
+          linesIdx.forEach(l => {
+            if (l.trim() !== '') {
+              pdf.text(l, M + 6, textY);
+            }
+            textY += 4.5;
+          });
+          
+          curY += codeBlockH;
+          
+          if (explanation) {
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(9);
+            pdf.setTextColor(100, 100, 100);
+            const expLines = pdf.splitTextToSize(explanation, CW - 8);
+            let expY = curY + 4;
+            expLines.forEach(l => {
+              pdf.text(l, M + 4, expY);
+              expY += 5;
+            });
+          }
+          
+          y += boxH + 6; // Extra space between options
+        });
+      }
+
+      // 6. Explanation & Strategy
+      if (result.explanation) {
+        sectionHeader('6. Explanation & Strategy', 20);
+        bodyText(result.explanation);
+      }
+
       const totalPages = pdf.internal.getNumberOfPages();
       for (let p = 1; p <= totalPages; p++) {
         pdf.setPage(p);
-        drawFooter();
-        // Page number written ONCE per page, right-aligned
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(...LTTEXT);
-        pdf.text(`Page ${p} of ${totalPages}`, W - M, 288.5, { align: 'right' });
+        drawFooter(p, totalPages);
       }
 
       const slug = new Date().toISOString().slice(0, 10);
@@ -370,6 +453,23 @@ export default function ResultPanel({ result, originalQuery, explanationLevel })
 
       <div className="flex-1 flex flex-col overflow-hidden">
 
+        {/* Dialect Mismatch Banner */}
+        {(() => {
+          const dialectMismatch = [...(result.detected_risks || []), ...(result.issues_found || [])].find(
+            msg => /dialect|mismatch|wrong database|mysql syntax|postgresql syntax|sqlite syntax|sql server syntax/i.test(msg)
+          );
+          if (!dialectMismatch) return null;
+          return (
+            <div className="mx-4 mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-amber-300 animate-in fade-in slide-in-from-top-2 duration-300">
+              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" />
+              <div>
+                <h4 className="font-bold text-xs uppercase tracking-wider text-amber-400">Dialect Mismatch Warning</h4>
+                <p className="text-xs text-amber-200 mt-1 leading-relaxed">{dialectMismatch}</p>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* KPI Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 border-b border-white/6 divide-x divide-white/5 shrink-0" style={{ background: 'rgba(255,255,255,0.01)' }}>
           <div className="p-4 flex flex-col justify-center">
@@ -384,11 +484,13 @@ export default function ResultPanel({ result, originalQuery, explanationLevel })
               <div className="h-full bg-blue-500 rounded-full transition-all duration-700" style={{ width: `${result.complexity_score || 0}%` }} />
             </div>
           </div>
-          <div className="p-4 flex flex-col justify-center">
+          <div className="p-4 flex flex-col justify-center overflow-hidden">
             <span className="text-[10px] uppercase font-bold text-slate-600 mb-1.5 flex items-center gap-1">
               <Zap className="w-3 h-3" /> Gain
             </span>
-            <span className="text-xl font-black text-emerald-400">{result.performance_gain}</span>
+            <span className="text-xl font-black text-emerald-400 truncate block" title={result.performance_gain}>
+              {cleanPerformanceGain(result.performance_gain)}
+            </span>
           </div>
           <div className="p-4 flex flex-col justify-center">
             <span className="text-[10px] uppercase font-bold text-slate-600 mb-1.5">Before / After</span>
@@ -451,25 +553,47 @@ export default function ResultPanel({ result, originalQuery, explanationLevel })
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
               </div>
-              <div className="flex-1 min-h-[450px] rounded-xl overflow-hidden border border-white/8">
+              <div className="h-[480px] rounded-xl overflow-hidden border border-white/8">
                 {viewMode === 'diff' ? (
                   <DiffEditor
                     height="100%"
                     language="sql"
                     theme="vs-dark"
-                    original={format(originalQuery || '', { language: 'postgresql' })}
-                    modified={format(result.optimized_query || '', { language: 'postgresql' })}
-                    options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12, fontFamily: 'JetBrains Mono, monospace', renderSideBySide: true }}
+                    original={safeFormatSQL(originalQuery || '', dbType)}
+                    modified={safeFormatSQL(result.optimized_query || '', dbType)}
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      fontSize: 12,
+                      fontFamily: 'JetBrains Mono, monospace',
+                      renderSideBySide: true,
+                      automaticLayout: true,
+                      padding: { top: 16, bottom: 16 },
+                      lineHeight: 20,
+                      wordWrap: 'on'
+                    }}
                   />
                 ) : (
-                  <DiffEditor
-                    height="100%"
-                    language="sql"
-                    theme="vs-dark"
-                    original={format(result.optimized_query || '', { language: 'postgresql' })}
-                    modified={format(result.optimized_query || '', { language: 'postgresql' })}
-                    options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12, fontFamily: 'JetBrains Mono, monospace', renderSideBySide: false }}
-                  />
+                  <div className="flex-1 h-full flex flex-col min-w-0 bg-[#1e1e1e]">
+                    <div className="text-[10px] font-bold text-emerald-400 bg-emerald-500/5 py-2 px-4 uppercase tracking-wider shrink-0 border-b border-white/5">Final Optimized Query</div>
+                    <Editor
+                      height="100%"
+                      language="sql"
+                      theme="vs-dark"
+                      value={safeFormatSQL(result.optimized_query || '', dbType)}
+                      options={{
+                        readOnly: true,
+                        minimap: { enabled: false },
+                        fontSize: 12,
+                        fontFamily: 'JetBrains Mono, monospace',
+                        automaticLayout: true,
+                        padding: { top: 16, bottom: 16 },
+                        lineHeight: 20,
+                        wordWrap: 'on',
+                        scrollBeyondLastLine: false
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -555,7 +679,7 @@ export default function ResultPanel({ result, originalQuery, explanationLevel })
                           {/* SQL block */}
                           <div className="relative group bg-[#0d1117]">
                             <pre className="text-xs font-mono text-purple-200 overflow-x-auto p-4 pr-14 leading-relaxed">
-                              {format(sql || '', { language: 'postgresql' })}
+                              {safeFormatSQL(sql || '', dbType)}
                             </pre>
                             <button
                               onClick={() => handleCopy(sql, 'index', i)}

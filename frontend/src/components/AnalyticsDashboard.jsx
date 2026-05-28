@@ -56,7 +56,7 @@ export default function AnalyticsDashboard() {
     { label: 'Total Optimized', value: totalQueries, icon: Activity, color: 'blue', sub: 'queries analyzed' },
     { label: 'Top Database', value: mostUsedDb, icon: Database, color: 'purple', sub: 'most used engine' },
     { label: 'Avg Complexity', value: `${avgComplexity}/100`, icon: TrendingUp, color: 'yellow', sub: 'complexity score' },
-    { label: 'Critical Risks', value: riskCounts['Critical'] || 0, icon: ShieldAlert, color: 'red', sub: 'flagged queries' },
+    { label: 'Critical Risks', value: (riskCounts['Critical'] || 0) + (riskCounts['High'] || 0), icon: ShieldAlert, color: 'red', sub: 'flagged queries' },
   ];
 
   const colorMap = {

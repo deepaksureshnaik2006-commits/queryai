@@ -94,6 +94,25 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Fetch single history item for user
+router.get('/:id', async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('query_history')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Query not found' });
+    }
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch query' });
+  }
+});
+
 // Toggle Favorite
 router.patch('/:id/favorite', async (req, res) => {
   try {
@@ -125,6 +144,21 @@ router.patch('/:id/public', async (req, res) => {
     res.json(data[0]);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update public status' });
+  }
+});
+
+// Delete all history for user
+router.delete('/all', async (req, res) => {
+  try {
+    const { error } = await supabaseAdmin
+      .from('query_history')
+      .delete()
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete all history items' });
   }
 });
 
