@@ -154,7 +154,7 @@ Otherwise, set it to false and proceed with analysis and optimization according 
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage }
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       temperature: 0.15,
       response_format: { type: 'json_object' }
     });
